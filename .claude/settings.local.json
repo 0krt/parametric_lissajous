@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/nlu/Downloads/**)",
+      "Bash(unzip -l \"/Users/nlu/Downloads/ableton-extension-builder.skill\")",
+      "Bash(unzip -p \"/Users/nlu/Downloads/ableton-extension-builder.skill\" \"ableton-extension-builder/SKILL.md\")",
+      "Bash(mkdir -p ~/.claude/skills)",
+      "Bash(unzip -q -o \"/Users/nlu/Downloads/ableton-extension-builder.skill\" -d ~/.claude/skills/)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(awk '{print $5, $9, $10, $11, $12, $13}')",
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "Read(//private/tmp/**)",
+      "Bash(rm -rf orca-inspect)",
+      "Bash(gh api *)",
+      "Bash(echo \"----EXIT $?----\")",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(grep -n \"noiseAmt:  { label:'Noise'\\\\|noiseAmt:0, waveX\\\\|MAP_DEFAULTS = {\" \"lissajous \\(9\\) - audio-input.html\")",
+      "WebFetch(domain:hundredrabbits.github.io)",
+      "mcp__mcp-registry__search_mcp_registry",
+      "Bash(git --version)",
+      "Bash(git config *)",
+      "Read(//Users/nlu/**)",
+      "Bash(brew --version)",
+      "Bash(git credential-osxkeychain *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(git remote *)"
+    ]
+  }
+}

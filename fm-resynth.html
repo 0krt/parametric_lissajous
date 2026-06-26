@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2-Op FM Resynth</title>
+<style>
+  :root{
+    --bg:#14161c; --panel:#1d212b; --panel2:#252a36; --line:#333a49;
+    --txt:#e6e9ef; --dim:#9aa3b2; --accent:#5ad1c7; --accent2:#f0a35e;
+    --bad:#e0556b;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--txt);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:28px; max-width:920px; margin:0 auto;
+  }
+  h1{font-size:20px; margin:0 0 4px}
+  .sub{color:var(--dim); margin:0 0 22px}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px}
+  .drop{
+    border:2px dashed var(--line); border-radius:12px; padding:34px; text-align:center;
+    color:var(--dim); cursor:pointer; transition:.15s; background:var(--panel2);
+  }
+  .drop.hot{border-color:var(--accent); color:var(--txt); background:#222a31}
+  .row{display:flex; gap:18px; flex-wrap:wrap; align-items:center}
+  .ctrl{flex:1 1 200px}
+  label{display:block; color:var(--dim); font-size:12px; margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em}
+  .val{color:var(--accent); font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%; accent-color:var(--accent)}
+  select{width:100%; background:var(--panel2); color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px}
+  button{
+    background:var(--accent); color:#10221f; border:0; border-radius:8px; padding:10px 16px;
+    font-weight:600; cursor:pointer; font-size:14px;
+  }
+  button.ghost{background:var(--panel2); color:var(--txt); border:1px solid var(--line)}
+  button:disabled{opacity:.4; cursor:not-allowed}
+  .btns{display:flex; gap:10px; flex-wrap:wrap; margin-top:6px}
+  canvas{width:100%; height:120px; display:block; background:#0e1015; border-radius:8px; border:1px solid var(--line)}
+  .meta{color:var(--dim); font-size:12px; margin-top:10px; font-variant-numeric:tabular-nums}
+  .pair{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  .tag{display:inline-block; background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:2px 8px; font-size:12px; color:var(--dim); margin-right:6px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+  <h1>2-Operator FM Resynth</h1>
+  <p class="sub">Drop a WAV. It estimates pitch, loudness &amp; brightness over time, then rebuilds the sound with a single carrier + modulator. Built for stability, not fidelity.</p>
+
+  <div class="panel">
+    <div id="drop" class="drop">
+      <strong>Drop a .wav here</strong> &nbsp;or click to choose<br>
+      <span style="font-size:12px">mono or stereo · any sample rate</span>
+      <input id="file" type="file" accept="audio/*,.wav" class="hidden">
+    </div>
+    <div id="loaded" class="meta hidden"></div>
+  </div>
+
+  <div class="panel" id="controls">
+    <div class="pair">
+      <div class="ctrl">
+        <label>Carrier : Modulator ratio <span class="val" id="ratioV">1.00</span></label>
+        <input id="ratio" type="range" min="0.5" max="4" step="0.5" value="1">
+      </div>
+      <div class="ctrl">
+        <label>Brightness → FM index <span class="val" id="depthV">5.0</span></label>
+        <input id="depth" type="range" min="0" max="12" step="0.1" value="5">
+      </div>
+    </div>
+    <div class="pair" style="margin-top:14px">
+      <div class="ctrl">
+        <label>Pitch smoothing <span class="val" id="smoothV">3</span></label>
+        <input id="smooth" type="range" min="1" max="9" step="2" value="3">
+      </div>
+      <div class="ctrl">
+        <label>Min loudness gate <span class="val" id="gateV">0.010</span></label>
+        <input id="gate" type="range" min="0" max="0.05" step="0.001" value="0.01">
+      </div>
+    </div>
+    <div class="btns" style="margin-top:18px">
+      <button id="playOrig" class="ghost" disabled>▶ Original</button>
+      <button id="playFm" disabled>▶ FM resynth</button>
+      <button id="stop" class="ghost" disabled>■ Stop</button>
+      <button id="dl" class="ghost" disabled>⬇ Download FM .wav</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <label>Waveform — <span style="color:var(--accent)">original</span> vs <span style="color:var(--accent2)">FM resynth</span></label>
+    <canvas id="wave" width="1800" height="240"></canvas>
+    <div class="meta" id="analysis"></div>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+const ctx = new (window.AudioContext||window.webkitAudioContext)();
+
+let origBuf=null;      // AudioBuffer (decoded)
+let origMono=null;     // Float32Array mono @ ctx.sampleRate
+let fmBuf=null;        // synthesized AudioBuffer
+let analysisFrames=null;
+let curSource=null;
+
+// ---------- file loading ----------
+const drop=$('drop'), file=$('file');
+drop.onclick=()=>file.click();
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('hot')};
+drop.ondragleave=()=>drop.classList.remove('hot');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('hot'); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);};
+file.onchange=e=>{ if(e.target.files[0]) loadFile(e.target.files[0]); };
+
+async function loadFile(f){
+  $('loaded').classList.remove('hidden');
+  $('loaded').textContent='Decoding '+f.name+' …';
+  const ab=await f.arrayBuffer();
+  try{
+    origBuf=await ctx.decodeAudioData(ab.slice(0));
+  }catch(err){
+    $('loaded').innerHTML='<span style="color:var(--bad)">Could not decode that file.</span>';
+    return;
+  }
+  // downmix to mono
+  const n=origBuf.length, mono=new Float32Array(n);
+  for(let c=0;c<origBuf.numberOfChannels;c++){
+    const d=origBuf.getChannelData(c);
+    for(let i=0;i<n;i++) mono[i]+=d[i];
+  }
+  for(let i=0;i<n;i++) mono[i]/=origBuf.numberOfChannels;
+  origMono=mono;
+  $('loaded').innerHTML='<span class="tag">'+f.name+'</span>'+
+    '<span class="tag">'+origBuf.duration.toFixed(2)+' s</span>'+
+    '<span class="tag">'+origBuf.sampleRate+' Hz</span>'+
+    '<span class="tag">'+origBuf.numberOfChannels+' ch</span>';
+  $('playOrig').disabled=false;
+  rebuild();
+}
+
+// ---------- analysis ----------
+// Frame the mono signal; per frame get RMS, pitch (autocorrelation), brightness (spectral centroid-ish via zero-cross weighted).
+function analyze(mono, sr){
+  const hop=Math.round(sr*0.01);        // 10 ms hop
+  const win=Math.round(sr*0.046);       // ~46 ms window
+  const minF=55, maxF=1000;
+  const maxLag=Math.floor(sr/minF), minLag=Math.floor(sr/maxF);
+  const frames=[];
+  for(let start=0; start+win<mono.length; start+=hop){
+    // RMS
+    let rms=0;
+    for(let i=0;i<win;i++){ const s=mono[start+i]; rms+=s*s; }
+    rms=Math.sqrt(rms/win);
+
+    // Autocorrelation pitch (normalized), only if energy present
+    let pitch=0, clarity=0;
+    if(rms>1e-4){
+      let bestLag=0, bestCorr=0, energy0=0;
+      for(let i=0;i<win;i++) energy0+=mono[start+i]*mono[start+i];
+      for(let lag=minLag; lag<=maxLag; lag++){
+        let c=0;
+        for(let i=0;i+lag<win;i++) c+=mono[start+i]*mono[start+i+lag];
+        const norm=c/(energy0+1e-9);
+        if(norm>bestCorr){ bestCorr=norm; bestLag=lag; }
+      }
+      if(bestLag>0){ pitch=sr/bestLag; clarity=bestCorr; }
+    }
+
+    // Brightness: zero-crossing rate within window (cheap, stable proxy for spectral content)
+    let zc=0;
+    for(let i=1;i<win;i++){ if((mono[start+i-1]<0)!==(mono[start+i]<0)) zc++; }
+    const bright=zc/win;   // ~0..0.5
+
+    frames.push({rms,pitch,clarity,bright});
+  }
+  return {frames,hop,sr};
+}
+
+function medianSmoothPitch(frames, k){
+  if(k<=1) return frames.map(f=>f.pitch);
+  const half=(k-1)>>1, out=new Array(frames.length);
+  for(let i=0;i<frames.length;i++){
+    const arr=[];
+    for(let j=-half;j<=half;j++){
+      const idx=i+j;
+      if(idx>=0&&idx<frames.length&&frames[idx].pitch>0) arr.push(frames[idx].pitch);
+    }
+    if(arr.length){ arr.sort((a,b)=>a-b); out[i]=arr[arr.length>>1]; }
+    else out[i]=0;
+  }
+  return out;
+}
+
+// ---------- synthesis ----------
+function synth(a, opts){
+  const {frames,hop,sr}=a;
+  const N=origMono.length;
+  const out=new Float32Array(N);
+  const pitches=medianSmoothPitch(frames, opts.smooth);
+
+  // carry last good pitch through unvoiced gaps for stability
+  let lastPitch=220;
+  const pitchLine=pitches.map(p=>{ if(p>0){lastPitch=p;return p;} return lastPitch; });
+
+  let phaseC=0, phaseM=0;
+  let curRms=0, curBright=0, curPitch=lastPitch;
+  const ratio=opts.ratio, depth=opts.depth, gate=opts.gate;
+  const smoothA=0.002; // one-pole param smoothing per sample (stability)
+
+  for(let i=0;i<N;i++){
+    const fi=Math.min(frames.length-1, Math.floor(i/hop));
+    const fr=frames[fi];
+    let tgtRms=fr.rms<gate?0:fr.rms;
+    // smooth control signals toward frame targets
+    curRms   += (tgtRms       - curRms  )*smoothA*2;
+    curBright+= (fr.bright     - curBright)*smoothA;
+    curPitch += (pitchLine[fi] - curPitch)*smoothA*2;
+
+    const fc=curPitch;
+    const fm=fc*ratio;
+    // FM index scales with brightness and user depth
+    const index=depth*Math.min(1, curBright*4);
+
+    phaseC+=2*Math.PI*fc/sr;
+    phaseM+=2*Math.PI*fm/sr;
+    out[i]=curRms*Math.sin(phaseC + index*Math.sin(phaseM));
+  }
+
+  // normalize to match peak of original-ish (avoid clipping)
+  let peak=0;
+  for(let i=0;i<N;i++){ const v=Math.abs(out[i]); if(v>peak)peak=v; }
+  if(peak>0){ const g=0.9/peak; for(let i=0;i<N;i++) out[i]*=g; }
+
+  const buf=ctx.createBuffer(1,N,sr);
+  buf.getChannelData(0).set(out);
+  return buf;
+}
+
+function rebuild(){
+  if(!origMono) return;
+  const sr=ctx.sampleRate;
+  analysisFrames=analyze(origMono, sr);
+  const opts={
+    ratio:parseFloat($('ratio').value),
+    depth:parseFloat($('depth').value),
+    smooth:parseInt($('smooth').value),
+    gate:parseFloat($('gate').value),
+  };
+  fmBuf=synth(analysisFrames, opts);
+  $('playFm').disabled=false; $('dl').disabled=false;
+  drawWave();
+  const voiced=analysisFrames.frames.filter(f=>f.pitch>0).length;
+  const avgP=analysisFrames.frames.filter(f=>f.pitch>0).reduce((s,f)=>s+f.pitch,0)/(voiced||1);
+  $('analysis').textContent=
+    `${analysisFrames.frames.length} frames · ${voiced} voiced · mean pitch ${avgP.toFixed(1)} Hz · ratio ${opts.ratio} · index≤${opts.depth}`;
+}
+
+// ---------- drawing ----------
+function drawWave(){
+  const cv=$('wave'), g=cv.getContext('2d');
+  g.clearRect(0,0,cv.width,cv.height);
+  const mid=cv.height/2;
+  const draw=(data,color)=>{
+    g.strokeStyle=color; g.lineWidth=1; g.beginPath();
+    const step=Math.max(1,Math.floor(data.length/cv.width));
+    for(let x=0;x<cv.width;x++){
+      let mn=1,mx=-1;
+      for(let j=0;j<step;j++){ const v=data[x*step+j]||0; if(v<mn)mn=v; if(v>mx)mx=v; }
+      g.moveTo(x,mid+mn*mid); g.lineTo(x,mid+mx*mid);
+    }
+    g.stroke();
+  };
+  if(origMono) draw(origMono,'rgba(90,209,199,.55)');
+  if(fmBuf) draw(fmBuf.getChannelData(0),'rgba(240,163,94,.7)');
+}
+
+// ---------- playback ----------
+function play(buf){
+  stop();
+  if(ctx.state==='suspended') ctx.resume();
+  const s=ctx.createBufferSource();
+  s.buffer=buf; s.connect(ctx.destination); s.start();
+  curSource=s; $('stop').disabled=false;
+  s.onended=()=>{ if(curSource===s){curSource=null;$('stop').disabled=true;} };
+}
+function stop(){ if(curSource){try{curSource.stop()}catch(e){} curSource=null;} $('stop').disabled=true; }
+
+$('playOrig').onclick=()=>play(origBuf);
+$('playFm').onclick=()=>{ if(fmBuf) play(fmBuf); };
+$('stop').onclick=stop;
+
+// ---------- controls ----------
+function bind(id,vid,fmt){
+  const el=$(id);
+  el.oninput=()=>{ $(vid).textContent=fmt(el.value); };
+  el.onchange=()=>{ rebuild(); };
+}
+bind('ratio','ratioV',v=>parseFloat(v).toFixed(2));
+bind('depth','depthV',v=>parseFloat(v).toFixed(1));
+bind('smooth','smoothV',v=>v);
+bind('gate','gateV',v=>parseFloat(v).toFixed(3));
+
+// ---------- WAV export ----------
+function bufferToWav(buf){
+  const sr=buf.sampleRate, ch=buf.getChannelData(0), n=ch.length;
+  const ab=new ArrayBuffer(44+n*2), dv=new DataView(ab);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i))};
+  ws(0,'RIFF'); dv.setUint32(4,36+n*2,true); ws(8,'WAVE'); ws(12,'fmt ');
+  dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,1,true);
+  dv.setUint32(24,sr,true); dv.setUint32(28,sr*2,true); dv.setUint16(32,2,true);
+  dv.setUint16(34,16,true); ws(36,'data'); dv.setUint32(40,n*2,true);
+  let o=44;
+  for(let i=0;i<n;i++){ let s=Math.max(-1,Math.min(1,ch[i])); dv.setInt16(o,s<0?s*0x8000:s*0x7FFF,true); o+=2; }
+  return new Blob([ab],{type:'audio/wav'});
+}
+$('dl').onclick=()=>{
+  if(!fmBuf) return;
+  const url=URL.createObjectURL(bufferToWav(fmBuf));
+  const a=document.createElement('a'); a.href=url; a.download='fm-resynth.wav'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+</script>
+</body>
+</html>
