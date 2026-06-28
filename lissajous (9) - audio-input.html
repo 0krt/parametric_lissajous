@@ -114,6 +114,12 @@
     padding-bottom: 5px;
     border-bottom: 1px solid var(--border);
   }
+  /* Foldable subsection (e.g. Warp & Sync) inside a section */
+  .subsection-label.foldable { cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; }
+  .subsection-label.foldable::after { content: '▾'; font-size: 9px; opacity: 0.6; transition: transform 0.15s; }
+  .subsection-fold.collapsed .subsection-label.foldable::after { transform: rotate(-90deg); }
+  .subsection-fold.collapsed .subsection-body { display: none; }
+
   .section.collapsed .section-label { margin-bottom: 0; }
   .section.collapsed .section-label::after { transform: rotate(-90deg); }
   .section.collapsed > *:not(.section-label) { display: none !important; }
@@ -892,8 +898,8 @@
 
   /* ── Right-hand session-preset grid sidebar ───────────────────────────── */
   .preset-sidebar {
-    width: 196px;
-    min-width: 196px;
+    width: 206px;
+    min-width: 206px;
     border-left: 1px solid var(--border);
     background: var(--panel);
     display: flex;
@@ -921,13 +927,16 @@
     overflow-y: auto;
     overflow-x: hidden;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-    padding: 10px 12px 14px;
+    grid-template-columns: repeat(4, 38px);
+    grid-auto-rows: 38px;          /* fixed rows → equal H/V gaps, uniform bottom row */
+    gap: 6px;
+    padding: 10px;
+    justify-content: center;
     align-content: start;
   }
   .grid-pad {
-    aspect-ratio: 1 / 1;
+    width: 38px;
+    height: 38px;
     border: 1px solid var(--border);
     border-radius: 3px;
     background: var(--bg);
@@ -1073,9 +1082,9 @@
       </div>
 
       <div class="mod-group">
-        <div class="vel-row"><span class="vel-label">Drive (fold)</span></div>
+        <div class="vel-row"><span class="vel-label">Wavefold</span></div>
         <div class="param-row">
-          <div class="param-header"><label>Amount</label><span class="val" id="fold-drive-val">1.0</span></div>
+          <div class="param-header"><label>Drive</label><span class="val" id="fold-drive-val">1.0</span></div>
           <input type="range" id="fold-drive" min="1" max="8" step="0.1" value="1">
         </div>
       </div>
@@ -1106,7 +1115,9 @@
         </div>
       </div>
 
-      <div class="subsection-label">Warp &amp; Sync</div>
+      <div class="subsection-fold collapsed" id="sub-warpsync">
+      <div class="subsection-label foldable">Warp &amp; Sync</div>
+      <div class="subsection-body">
       <div class="mod-group">
         <div class="vel-row"><span class="vel-label">PWM (pulse width)</span></div>
         <div class="param-row">
@@ -1138,12 +1149,14 @@
         <div class="vel-row"><span class="vel-label">Sync</span></div>
         <div class="param-row">
           <div class="param-header"><label>Ratio</label><span class="val" id="sync-amt-val">1.00</span></div>
-          <input type="range" id="sync-amt" min="0.1" max="2" step="0.05" value="1">
+          <input type="range" id="sync-amt" min="0.1" max="2" step="0.01" value="1">
         </div>
         <div style="display:flex;gap:16px;margin-top:2px">
           <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--label);cursor:pointer"><input type="checkbox" id="sync-hard" checked style="accent-color:var(--accent2);cursor:pointer">hard sync</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--label);cursor:pointer"><input type="checkbox" id="sync-single" style="accent-color:var(--accent2);cursor:pointer">X only</label>
         </div>
+      </div>
+      </div>
       </div>
 
       <div class="subsection-label">Patch</div>
@@ -1356,7 +1369,7 @@
         <input type="range" id="hsl-s" min="0" max="100" step="1" value="84">
       </div>
       <div class="param-row hsl-row">
-        <div class="param-header"><label>Lightness</label><span class="val" id="hsl-l-val">66</span></div>
+        <div class="param-header"><label>Luminosity</label><span class="val" id="hsl-l-val">66</span></div>
         <input type="range" id="hsl-l" min="0" max="100" step="1" value="66">
       </div>
       <div class="color-row"><label>Background</label><input type="color" id="bg-color" value="#0c0c0e"></div>
@@ -1403,6 +1416,14 @@
       <div class="checkbox-row">
         <input type="checkbox" id="show-interval" checked>
         <label for="show-interval">Show interval label</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="show-active-param">
+        <label for="show-active-param">Show active parameter</label>
+      </div>
+      <div class="param-row">
+        <div class="param-header"><label>Label text size</label><span class="val" id="label-size-val">11 px</span></div>
+        <input type="range" id="label-size" min="8" max="40" step="1" value="11">
       </div>
 
       <button class="btn btn-primary" id="btn-export" style="width:100%;margin-top:12px">Export SVG</button>
@@ -1473,6 +1494,19 @@
       color:rgba(255,255,255,0.35);
       pointer-events:none;
       white-space:nowrap;
+    "></div>
+    <div id="active-param-label" style="
+      position:absolute;
+      bottom:14px;
+      left:50%;
+      transform:translateX(-50%);
+      font-family:'IBM Plex Mono',monospace;
+      font-size:11px;
+      letter-spacing:0.12em;
+      color:var(--accent);
+      pointer-events:none;
+      white-space:nowrap;
+      display:none;
     "></div>
   </div>
 
@@ -1916,17 +1950,32 @@ function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
   ctx.lineWidth = lineWidth * 0.8;
   ctx.stroke();
 
-  // ── Full Lissajous (dim background = the untraced part)
-  ctx.beginPath();
-  for (let i = 0; i <= res; i++) {
-    const τ = (i / res) * T;
-    const xp = cx + rx * hAt(τ);
-    const yp = cy + ry * vAt(τ);
-    i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
+  // ── Full Lissajous (dim background = the untraced part), honouring Dots ↔ Line
+  const dl = params.dotsLine ?? 1;
+  const untracedCol = hexToRgba(strokeColor, Math.max(0, Math.min(1, params.untracedAlpha)));
+  if (dl >= 0.999) {
+    ctx.beginPath();
+    for (let i = 0; i <= res; i++) {
+      const τ = (i / res) * T;
+      const xp = cx + rx * hAt(τ);
+      const yp = cy + ry * vAt(τ);
+      i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
+    }
+    ctx.strokeStyle = untracedCol;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  } else {
+    // Same dot density mapping as the main view (drawLissajous).
+    const dotCount = Math.max(10, Math.round(12 * Math.pow(560, dl)));
+    const r = Math.max(0.8, lineWidth);
+    ctx.fillStyle = untracedCol;
+    for (let k = 0; k < dotCount; k++) {
+      const τ = (k / dotCount) * T;
+      const xp = cx + rx * hAt(τ);
+      const yp = cy + ry * vAt(τ);
+      ctx.beginPath(); ctx.arc(xp, yp, r, 0, Math.PI * 2); ctx.fill();
+    }
   }
-  ctx.strokeStyle = hexToRgba(strokeColor, Math.max(0, Math.min(1, params.untracedAlpha)));
-  ctx.lineWidth = lineWidth;
-  ctx.stroke();
 
   // ── Current positions
   const xAmpNow = hAt(t);
@@ -2415,7 +2464,13 @@ const VEL_RANGES = {
   dotsLine:  [0, 1],
   traceSpeed:    [0, 5],
   untracedAlpha: [0, 1],
+  hue:   [0, 360],
+  sat:   [0, 100],
+  light: [0, 100],
 };
+// LFO target keys that live on strokeHSL (not params) — handled specially in
+// applyLFOs/restoreLFOs so colour can be modulated like any other target.
+const HSL_LFO = { hue: 'h', sat: 's', light: 'l' };
 
 // Per-parameter sidebar slider bindings (so modulation/MIDI can reflect in UI).
 const PARAM_UI = {
@@ -2442,10 +2497,11 @@ const PARAM_UI = {
 // ── LFO engine ───────────────────────────────────────────────────────────────
 const LFO_TARGET_OPTIONS = [
   ['fmAmount','FM Amount'], ['fmRatio','FM Ratio'], ['shapeAmt','Waveshape'], ['pwAmount','PWM Width'],
-  ['amAmt','AM Depth'], ['amRatio','AM Ratio'], ['foldDrive','Drive (fold)'], ['warpH','Warp H'], ['warpV','Warp V'],
+  ['amAmt','AM Depth'], ['amRatio','AM Ratio'], ['foldDrive','Wavefold Drive'], ['warpH','Warp H'], ['warpV','Warp V'],
   ['syncAmt','Sync'], ['noiseAmt','Noise (wave)'], ['filterCutoff','Filter Cutoff'], ['filterQ','Filter Reso'],
   ['ax','X Amplitude'], ['ay','Y Amplitude'], ['phase','Phase'], ['lineWidth','Line Width'], ['dotsLine','Dots ↔ Line'],
   ['traceSpeed','Trace Tempo'], ['untracedAlpha','Untraced Opacity'],
+  ['hue','Colour Hue'], ['sat','Colour Sat'], ['light','Colour Luminosity'],
 ];
 // Keys whose modulation requires rebuilding the periodic wavetable (noise is a
 // separate live audio source, so it's intentionally excluded here).
@@ -2475,6 +2531,11 @@ const lfos = [0, 1].map(i => ({
 // LFO param save/restore (applied around each draw)
 const _lfoSaved = {};
 let _lfoSavedKeys = null;
+let _lfoSavedColor = null, _lfoColorActive = false;
+
+// Get/set a target value, transparently handling colour keys (strokeHSL) vs params.
+function _lfoGet(key) { return HSL_LFO[key] ? strokeHSL[HSL_LFO[key]] : params[key]; }
+function _lfoSet(key, val) { if (HSL_LFO[key]) strokeHSL[HSL_LFO[key]] = val; else params[key] = val; }
 
 function advanceLFOs(dtSec) {
   if (!Number.isFinite(dtSec) || dtSec <= 0) return;
@@ -2490,21 +2551,31 @@ function lfoOutput(lfo) {
 function applyLFOs() {
   const keys = new Set();
   lfos.forEach(l => l.assignments.forEach(k => keys.add(k)));
-  keys.forEach(k => _lfoSaved[k] = params[k]);
   _lfoSavedKeys = keys;
+  let colorTouched = false;
+  keys.forEach(k => { _lfoSaved[k] = _lfoGet(k); if (HSL_LFO[k]) colorTouched = true; });
+  if (colorTouched) _lfoSavedColor = params.strokeColor;
   lfos.forEach(lfo => {
     if (!lfo.assignments.length) return;
     const v = lfoOutput(lfo);
     lfo.assignments.forEach(key => {
       const r = VEL_RANGES[key]; if (!r) return;
       const [lo, hi] = r;
-      params[key] = Math.max(lo, Math.min(hi, params[key] + v * (hi - lo) * 0.5));
+      _lfoSet(key, Math.max(lo, Math.min(hi, _lfoGet(key) + v * (hi - lo) * 0.5)));
     });
   });
+  // Colour keys live on strokeHSL; fold the modulated HSL into the live stroke colour.
+  if (colorTouched) {
+    params.strokeColor = hslToHex(strokeHSL.h, strokeHSL.s, strokeHSL.l);
+    _lfoColorActive = true;
+  } else {
+    _lfoColorActive = false;
+  }
 }
 
 function restoreLFOs() {
-  if (_lfoSavedKeys) _lfoSavedKeys.forEach(k => params[k] = _lfoSaved[k]);
+  if (_lfoSavedKeys) _lfoSavedKeys.forEach(k => _lfoSet(k, _lfoSaved[k]));
+  if (_lfoColorActive) { params.strokeColor = _lfoSavedColor; _lfoColorActive = false; }
 }
 
 function retriggerLFOs() {
@@ -3240,6 +3311,58 @@ document.getElementById('show-interval').addEventListener('change', e => {
   updateIntervalLabel();
 });
 
+// ── Active-parameter readout + label text size ───────────────────────────────
+let showActiveParam = false;
+let activeParamText = '';
+let labelSize = 11;
+
+function filterAbbrev() { return ({ lowpass:'LP', highpass:'HP', bandpass:'BP', notch:'Notch' })[filterType] || 'Filter'; }
+function activeLabelForKey(key) {
+  if (key === 'filterCutoff') return filterAbbrev() + ' Cutoff';
+  if (key === 'filterQ')      return filterAbbrev() + ' Reso';
+  const t = MAP_TARGETS[key];
+  if (t) return t.label;
+  return ({ traceSpeed:'Trace Tempo', untracedAlpha:'Untraced Opacity', resolution:'Resolution' })[key] || key;
+}
+// Slider DOM id → target key (for the manual-drag readout).
+const ALTER_SLIDER_KEY = {
+  'fm-amount':'fmAmount','fm-ratio':'fmRatio','am-amt':'amAmt','am-ratio':'amRatio',
+  'shape-amt':'shapeAmt','pw-amount':'pwAmount','fold-drive':'foldDrive',
+  'warph-amt':'warpH','warpv-amt':'warpV','sync-amt':'syncAmt','noise-amt':'noiseAmt',
+  'filter-freq':'filterCutoff','filter-res':'filterQ','ax':'ax','ay':'ay','fx':'fx','fy':'fy',
+  'phase':'phase','line-width':'lineWidth','dots-line':'dotsLine',
+  'hsl-h':'hue','hsl-s':'sat','hsl-l':'light','anim-speed':'animSpeed','audio-vol':'volume',
+  'trace-speed':'traceSpeed','untraced-alpha':'untracedAlpha','resolution':'resolution',
+};
+function setActiveParam(label) { activeParamText = label; renderActiveParam(); }
+function renderActiveParam() {
+  const el = document.getElementById('active-param-label');
+  if (!el) return;
+  el.textContent = activeParamText;
+  el.style.display = (showActiveParam && activeParamText) ? '' : 'none';
+}
+function applyLabelSize() {
+  const a = document.getElementById('interval-label');
+  const b = document.getElementById('active-param-label');
+  if (a) a.style.fontSize = labelSize + 'px';
+  if (b) b.style.fontSize = labelSize + 'px';
+}
+document.getElementById('show-active-param').addEventListener('change', e => {
+  showActiveParam = e.target.checked;
+  renderActiveParam();
+});
+document.getElementById('label-size').addEventListener('input', e => {
+  labelSize = parseInt(e.target.value);
+  document.getElementById('label-size-val').textContent = labelSize + ' px';
+  applyLabelSize();
+});
+// Manual slider drags → readout (CC/Evolve go through setTargetValue, see below).
+document.querySelector('.sidebar').addEventListener('input', e => {
+  const id = e.target && e.target.id;
+  const key = id && ALTER_SLIDER_KEY[id];
+  if (key) setActiveParam(activeLabelForKey(key));
+});
+
 function freqRatioToCents(f1, f2) {
   // Returns cents difference: how far is f2/f1 from the nearest 12-TET interval
   if (f1 <= 0 || f2 <= 0) return null;
@@ -3455,6 +3578,13 @@ document.querySelectorAll('.section > .section-label').forEach(label => {
     label.parentElement.classList.toggle('collapsed');
   });
 });
+// Foldable subsections (e.g. Warp & Sync) — toggle their wrapping .subsection-fold.
+document.querySelectorAll('.subsection-label.foldable').forEach(label => {
+  label.addEventListener('click', () => {
+    const fold = label.closest('.subsection-fold');
+    if (fold) fold.classList.toggle('collapsed');
+  });
+});
 
 // ── Realtime LFO → audio and slider sync ─────────────────────────────────────
 let _lastLFOSliderTick = 0;
@@ -3574,8 +3704,8 @@ const MAP_TARGETS = {
   shapeAmt:  { label:'Waveshape',     min:0,    max:1,              apply:_synthApply('shapeAmt','shape-amt','shape-amt-val',x=>x.toFixed(2)) },
   warpH:     { label:'Warp H',        min:-0.5, max:0.5,            apply:_synthApply('warpH','warph-amt','warph-amt-val',x=>x.toFixed(2)) },
   warpV:     { label:'Warp V',        min:-1,   max:1,              apply:_synthApply('warpV','warpv-amt','warpv-amt-val',x=>x.toFixed(2)) },
-  syncAmt:   { label:'Sync Ratio',    min:0.1,  max:2,   step:0.05, apply:_synthApply('syncAmt','sync-amt','sync-amt-val',x=>x.toFixed(2)) },
-  foldDrive: { label:'Drive (fold)',  min:1,    max:8,              apply:_synthApply('foldDrive','fold-drive','fold-drive-val',x=>x.toFixed(1)) },
+  syncAmt:   { label:'Sync Ratio',    min:0.1,  max:2,   step:0.01, apply:_synthApply('syncAmt','sync-amt','sync-amt-val',x=>x.toFixed(2)) },
+  foldDrive: { label:'Wavefold Drive',min:1,    max:8,              apply:_synthApply('foldDrive','fold-drive','fold-drive-val',x=>x.toFixed(1)) },
   amAmt:     { label:'AM Depth',      min:0,    max:1,              apply:_synthApply('amAmt','am-amt','am-amt-val',x=>x.toFixed(2)) },
   amRatio:   { label:'AM Ratio',      min:0.5,  max:8,              apply:v => setRatioParam('amRatio','am-ratio','am-ratio-val',v) },
   noiseAmt:  { label:'Noise (wave)',  min:0,    max:0.1,            apply:_synthApply('noiseAmt','noise-amt','noise-amt-val',x=>x.toFixed(3)) },
@@ -3587,7 +3717,7 @@ const MAP_TARGETS = {
   lfo1Depth: { label:'LFO 2 Depth',   min:0,    max:1,              apply:v => { lfos[1].depth = v; const e=document.getElementById('lfo1-depth'); if(e)e.value=v; const d=document.getElementById('lfo1-depth-val'); if(d)d.textContent=Math.round(v*100)+'%'; } },
   hue:       { label:'Colour Hue',    min:0,    max:360,            apply:v => { strokeHSL.h = v; applyStrokeHSL(); } },
   sat:       { label:'Colour Sat',    min:0,    max:100,            apply:v => { strokeHSL.s = v; applyStrokeHSL(); } },
-  light:     { label:'Colour Light',  min:0,    max:100,            apply:v => { strokeHSL.l = v; applyStrokeHSL(); } },
+  light:     { label:'Colour Luminosity', min:0, max:100,           apply:v => { strokeHSL.l = v; applyStrokeHSL(); } },
   lineWidth: { label:'Line Width',    min:0.5,  max:8,              apply:v => { params.lineWidth = v; document.getElementById('line-width').value=v; document.getElementById('line-width-val').textContent=v.toFixed(1); } },
   phase:     { label:'Phase δ',       min:0,    max:2,              apply:v => { params.phase = v; animPhase = v; document.getElementById('phase').value=v; document.getElementById('phase-val').textContent=v.toFixed(2)+'π'; updateStatus(); } },
   animSpeed: { label:'Anim Speed',    min:0.1,  max:5,              apply:v => { animSpeed = v; document.getElementById('anim-speed').value=v; document.getElementById('speed-val').textContent=v.toFixed(1)+'×'; } },
@@ -3630,11 +3760,12 @@ function resetMappedParams() {
 function setTargetValue(key, value) {
   const t = MAP_TARGETS[key];
   if (!t) return;
-  if (t.toggle) { t.apply(value > 0); midiLastAt = performance.now(); return; }
+  if (t.toggle) { t.apply(value > 0); midiLastAt = performance.now(); setActiveParam(activeLabelForKey(key)); return; }
   if (t.step) value = Math.round(value / t.step) * t.step;
   value = Math.max(t.min, Math.min(t.max, value));
   t.apply(value);
   midiLastAt = performance.now();
+  setActiveParam(activeLabelForKey(key));
 }
 
 // ── Mapping list state ────────────────────────────────────────────────────────
@@ -3786,12 +3917,17 @@ function renderMapList() {
       // range lo/hi
       const range = document.createElement('div');
       range.className = 'map-range';
+      // Range is limited to the target's own min..max; typed values snap/clamp to it.
+      const tmin = t.min ?? 0, tmax = t.max ?? 1;
+      const clampT = v => Math.max(tmin, Math.min(tmax, v));
       const loI = document.createElement('input');
-      loI.type = 'number'; loI.id = 'map-lo-' + m.id; loI.value = +m.lo.toFixed(3); loI.step = t.step || 'any'; loI.title = 'min value';
-      loI.addEventListener('input', e => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) m.lo = v; });
+      loI.type = 'number'; loI.id = 'map-lo-' + m.id; loI.value = +m.lo.toFixed(3); loI.step = t.step || 'any'; loI.min = tmin; loI.max = tmax; loI.title = `min value (${tmin}…${tmax})`;
+      loI.addEventListener('input', e => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) m.lo = clampT(v); });
+      loI.addEventListener('change', e => { let v = parseFloat(e.target.value); v = Number.isFinite(v) ? clampT(v) : tmin; m.lo = v; e.target.value = +v.toFixed(3); });
       const hiI = document.createElement('input');
-      hiI.type = 'number'; hiI.id = 'map-hi-' + m.id; hiI.value = +m.hi.toFixed(3); hiI.step = t.step || 'any'; hiI.title = 'max value';
-      hiI.addEventListener('input', e => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) m.hi = v; });
+      hiI.type = 'number'; hiI.id = 'map-hi-' + m.id; hiI.value = +m.hi.toFixed(3); hiI.step = t.step || 'any'; hiI.min = tmin; hiI.max = tmax; hiI.title = `max value (${tmin}…${tmax})`;
+      hiI.addEventListener('input', e => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) m.hi = clampT(v); });
+      hiI.addEventListener('change', e => { let v = parseFloat(e.target.value); v = Number.isFinite(v) ? clampT(v) : tmax; m.hi = v; e.target.value = +v.toFixed(3); });
       range.appendChild(loI);
       const dash = document.createElement('span'); dash.textContent = '→'; range.appendChild(dash);
       range.appendChild(hiI);
@@ -4187,9 +4323,22 @@ function captureRecFrame(phase) {
 }
 
 function pickVideoMime() {
-  const mp4 = ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=h264', 'video/mp4'].find(t => MediaRecorder.isTypeSupported(t));
-  const webm = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find(t => MediaRecorder.isTypeSupported(t));
-  return mp4 || webm || '';
+  // CRITICAL: the mime must declare an AUDIO codec, not just the video codec.
+  // A video-only codec string (e.g. 'video/mp4;codecs=avc1.42E01E') makes Chrome mux
+  // the audio in a default/odd codec that many players silently drop — the file looks
+  // muted even though the track is present. Declaring mp4a.40.2 (AAC-LC) / opus fixes
+  // playback everywhere. Audio-bearing candidates are tried first.
+  const candidates = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4;codecs=avc1.4d002a,mp4a.40.2',
+    'video/mp4;codecs=h264,aac',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=opus',
+    'video/mp4',
+    'video/webm',
+  ];
+  return candidates.find(t => MediaRecorder.isTypeSupported(t)) || '';
 }
 
 function startRecording() {
@@ -4233,7 +4382,8 @@ function startRecording() {
   recording = true;
   const btn = document.getElementById('rec-toggle');
   btn.textContent = '■ stop'; btn.style.borderColor = '#f06060'; btn.style.color = '#f06060';
-  recStatus(`● recording ${outW}×${outH} (${recAspectName})${hasAudio ? ' + audio' : ' (no audio — enable output)'}…`);
+  const atc = stream.getAudioTracks().length;
+  recStatus(`● recording ${outW}×${outH} (${recAspectName})${hasAudio ? ` + audio (${atc} track)` : ' (no audio — enable output)'}…`);
 }
 
 function stopRecording() {
@@ -4404,7 +4554,7 @@ document.getElementById('evolve-reset').addEventListener('click', evolveReset);
 // colour is the stored patch's line colour.
 const GRID_PADS = 64;           // 4 columns × 16 rows
 const GRID_BASE_NOTE = 24;      // C1 (note 24, with C-1 = 0)
-let gridChannel = 1;            // MIDI channel (1–16) the whole grid listens on
+let gridChannel = 16;           // MIDI channel (1–16) the whole grid listens on
 let gridStoreMode = false;      // false = click loads a pad, true = click stores into it
 let gridPresets = new Array(GRID_PADS).fill(null);
 let gridActiveIdx = -1;
@@ -4544,6 +4694,8 @@ document.getElementById('grid-toggle').addEventListener('click', () => {
 buildGrid();
 setGridStoreMode(false);
 updateConstructionControls();
+applyLabelSize();
+renderActiveParam();
 buildPresetGrid();
 highlightActivePreset();
 buildLFOPanels();

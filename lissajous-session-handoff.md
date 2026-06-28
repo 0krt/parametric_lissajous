@@ -6,7 +6,7 @@
 
 ## What this project is
 
-A single-file vanilla HTML/CSS/JS audio-visual synthesizer that draws Lissajous curves (parametric X/Y figures on a canvas) and produces matching audio via the Web Audio API. All state lives in one file: `lissajous (9) - audio-input.html` (~4575 lines). There is no build step.
+A single-file vanilla HTML/CSS/JS audio-visual synthesizer that draws Lissajous curves (parametric X/Y figures on a canvas) and produces matching audio via the Web Audio API. All state lives in one file: `lissajous (9) - audio-input.html` (~4730 lines). There is no build step.
 
 A local dev server is configured in `.claude/launch.json`: `python3 -m http.server 8765`. Open `http://localhost:8765/lissajous%20(9)%20-%20audio-input.html` in a browser to test.
 
@@ -29,7 +29,7 @@ A local dev server is configured in `.claude/launch.json`: `python3 -m http.serv
 - **Dots ↔ Line slider** (`params.dotsLine`): at max = continuous line; lower = dots (visual sample-size reduction)
 - **Phase rotates FM/AM modulators checkbox** (`phaseModulators`): when on, the carrier's phase offset also offsets FM and AM modulator phases
 - Background color covers entire page (not just canvas)
-- **Construction view** (`drawMode4`, `constructionView`): figure-tracing animation with X/Y wave strips, projection lines, and a bright trail. **Active by default on startup.** As of this session `drawMode4` builds **filtered** per-axis sample arrays (`_m4BufX`/`_m4BufY`) and applies the multimode filter with the same normalized cutoff as `drawLissajous`, so the construction view now reflects EVERY waveform stage (filter, sync, warps, PWM, fold, AM, noise) identically to the main view. Two sliders (shown only when construction view is on):
+- **Construction view** (`drawMode4`, `constructionView`): figure-tracing animation with X/Y wave strips, projection lines, and a bright trail. **Active by default on startup.** `drawMode4` builds **filtered** per-axis sample arrays (`_m4BufX`/`_m4BufY`) and applies the multimode filter with the same normalized cutoff as `drawLissajous`, so the construction view reflects EVERY waveform stage (filter, sync, warps, PWM, fold, AM, noise) identically to the main view. It also honours **`params.dotsLine`** (the untraced background figure is drawn as dots, same density mapping as the main view) — so all params now read through. Two sliders (shown only when construction view is on):
   - **Trace tempo** (`params.traceSpeed`): speed the figure is traced, independent of the phase-animation speed (`animSpeed`). Drives `mode4T` advance.
   - **Untraced opacity** (`params.untracedAlpha`, 0–1): opacity of the dim not-yet-traced background figure.
 
@@ -40,7 +40,9 @@ A local dev server is configured in `.claude/launch.json`: `python3 -m http.serv
 - **IN meter**: shows RMS level of external input
 - **`↻ reset audio engine` button** (`resetAudioEngine`): full teardown + rebuild of the Web Audio graph against the *current* system devices, then recaptures the selected input. Reliable recovery when the engine wedges after a macOS in/out device change.
 - **`grant access & list devices`** also re-establishes capture when in EXTERNAL mode (not just re-lists). `connectExternalInput` rebuilds a `closed` context and resumes a `suspended` one.
-- **MediaRecorder** for video: canvas stream + audio track. **Records from the Web Audio tap (`recDest`) for BOTH internal and external** — external feeds masterGain → recDest. (Recording the raw getUserMedia track directly produced silent external recordings in Chrome once the track was also consumed by the AudioContext + the muted `<audio>` pump; recDest is taken before the monitor mute so recordings still contain audio with monitoring off. External record level follows the Monitor-level slider, so keep it > 0.) **Frame-preview overlay hidden by default on startup** (`recShowFrame = false`).
+- **MediaRecorder** for video: canvas stream + audio track. **Records from the Web Audio tap (`recDest`) for BOTH internal and external** — external feeds masterGain → recDest. recDest is taken before the monitor mute so recordings keep audio with monitoring off; external record level follows the Monitor-level slider (keep it > 0).
+  - **`pickVideoMime()` MUST declare an audio codec**, not just the video codec. The earlier bug: the mime was `video/mp4;codecs=avc1.42E01E` (video-only) so Chrome muxed audio in a default/odd codec that players silently dropped — the file looked muted even though `decodeAudioData` could still read it. Fixed by trying audio-bearing mimes first: `video/mp4;codecs=avc1.42E01E,mp4a.40.2` (AAC-LC) → `…,opus` webm fallbacks. Recording status shows the attached audio-track count.
+  - **Frame-preview overlay hidden by default on startup** (`recShowFrame = false`).
 - **WAV export**: single-cycle waveform export button. **Tuned to C0** (≈16.35 Hz): 2048-sample frame written at `SINGLE_CYCLE_SR = round(2048 × C0_HZ) = 33488 Hz`, so the cycle's natural fundamental is C0. Filename tagged `_C0`.
 - Wave preview display above WAV export (responsive width)
 
@@ -53,8 +55,9 @@ A local dev server is configured in `.claude/launch.json`: `python3 -m http.serv
 
 ### LFOs
 - Two LFOs, each with wave/rate/depth/retrigger + assignable targets (`lfos[]`, `buildLFOPanels`, `renderLFOTargets`).
-- Transient apply/restore model: `applyLFOs()` writes modulated values into `params` before draw, `restoreLFOs()` reverts after; the wavetable is rebuilt while values are live (`pwTick`). This means LFO targets are limited to **params-backed continuous keys the figure/wavetable actually read** — NOT audio-node-only params (volume, pitch) or color.
-- Target set (`LFO_TARGET_OPTIONS` / `VEL_RANGES`) expanded this session to: fmAmount, **fmRatio**, shapeAmt, pwAmount, amAmt, **amRatio**, foldDrive, warpH, warpV, syncAmt, noiseAmt, **filterCutoff**, **filterQ**, ax, ay, phase, lineWidth, **dotsLine**, **traceSpeed**, **untracedAlpha**. `LFO_SYNTH_KEYS` (keys that trigger continuous wavetable rebuild) gained fmRatio/amRatio/filterCutoff/filterQ.
+- Transient apply/restore model: `applyLFOs()` writes modulated values before draw, `restoreLFOs()` reverts after; the wavetable is rebuilt while values are live (`pwTick`). LFO targets are params-backed continuous keys the figure/wavetable read — NOT audio-node-only params (volume, pitch).
+- `_lfoGet`/`_lfoSet` transparently route **colour** keys (`hue`/`sat`/`light`) to `strokeHSL` (`HSL_LFO` map); when any colour key is modulated, `applyLFOs` folds the modulated HSL into `params.strokeColor` and `restoreLFOs` reverts it.
+- Target set (`LFO_TARGET_OPTIONS` / `VEL_RANGES`): fmAmount, fmRatio, shapeAmt, pwAmount, amAmt, amRatio, foldDrive (Wavefold Drive), warpH, warpV, syncAmt, noiseAmt, filterCutoff, filterQ, ax, ay, phase, lineWidth, dotsLine, traceSpeed, untracedAlpha, **hue, sat, light** (Colour Hue/Sat/Luminosity). `LFO_SYNTH_KEYS` (continuous wavetable rebuild) includes fmRatio/amRatio/filterCutoff/filterQ.
 
 ### Evolve (parameter mutation) — `section-evolve`, below LFOs
 - **Mutate** button randomises every *included* parameter toward a random in-range value by the **Deviation** amount (`evolve(amount)`); deviation 1 = fully random, 0 = unchanged (lerp current→random).
@@ -64,9 +67,9 @@ A local dev server is configured in `.claude/launch.json`: `python3 -m http.serv
 
 ### Session preset grid (right sidebar)
 - Toggle: **`PRESETS`** button in the header (`grid-toggle`); folds the right sidebar via `.layout.grid-hidden`. **Folded by default.**
-- **4×16 = 64 pads** (`GRID_PADS`). Each pad stores a full patch (`serializePreset()` snapshot); loading calls `applyPresetData()`.
+- **4×16 = 64 pads** (`GRID_PADS`), fixed 38px squares with equal 6px H/V gaps (CSS uses fixed `grid-template-columns`/`grid-auto-rows`, not `1fr`/`aspect-ratio`, so the bottom row is uniform). Each pad stores a full patch (`serializePreset()` snapshot); loading calls `applyPresetData()`.
 - **LOAD / STORE mode toggle**: click loads (LOAD) or stores current patch into the pad (STORE). **Right-click clears** a pad.
-- Pads addressable from **C1** (`GRID_BASE_NOTE = 24`), pad i → note 24+i. All 64 pads (C1–D#6, notes 24–87) are within MIDI range — no click-only pads.
+- Pads addressable from **C1** (`GRID_BASE_NOTE = 24`), pad i → note 24+i. All 64 pads (C1–D#6, notes 24–87) are within MIDI range. **Default `gridChannel = 16`.**
 - **Pad color = the stored patch's line color** (`params.strokeColor`); label text auto-contrasts (black/white by luminance).
 - **Export / import** the whole grid as JSON (`exportGrid` / `importGrid`): `{ app:'lissajous-grid', version:1, baseNote, channel, presets[] }`. Grid is session storage, separate from the single-patch save/load.
 - State: `gridPresets[64]`, `gridChannel`, `gridStoreMode`, `gridActiveIdx`. Build: `buildGrid` / `renderGrid` / `renderGridPad`.
@@ -74,8 +77,11 @@ A local dev server is configured in `.claude/launch.json`: `python3 -m http.serv
 ### UI
 - Collapsible sidebar sections (cards)
 - Left sections: **Synthesis, Frequencies, Audio, Figure, Video, LFOs, Evolve, CC Mappings**
-- **Synthesis order** (reorganised this session): X/Y wave + WAV export → **AM** (moved to top) → FM → Waveshape → Drive(fold) → Noise → Filter → **"Warp & Sync" subsection** (PWM, Warp H, Warp V, Sync) → **"Patch" subsection** (export/import `preset-save`/`preset-load`, moved here from Frequencies) → Reset All. Frequencies keeps the ratio preset grid ("Ratio Presets").
-- 280px left sidebar, no horizontal scroll. Right preset sidebar is 196px (`.preset-sidebar`), folds away.
+- **Synthesis order**: X/Y wave + WAV export → **AM** → FM → Waveshape → **Wavefold** (was "Drive (fold)"; section "Wavefold", param "Drive") → Noise → Filter → **"Warp & Sync"** foldable subsection (PWM, Warp H, Warp V, Sync — **collapsed by default**; `.subsection-fold`/`.subsection-label.foldable`, toggled in the collapsible-sections JS) → **"Patch"** subsection (export/import) → Reset All. Frequencies keeps the ratio preset grid.
+- **Renames**: "Drive (fold)"→**Wavefold** (param "Drive"); Figure "Lightness"→**Luminosity** (CC label "Colour Luminosity"). Sync slider step is **0.01** (slider + `MAP_TARGETS.syncAmt.step`).
+- **CC mapping ranges** auto-fill to the target's `min..max` on target-select, and typed lo/hi values **clamp** to that range (number inputs get `min`/`max` + clamp on input/change). See `renderMapList`.
+- **Active-parameter readout** (`#active-param-label`, below the interval label): checkbox `show-active-param` shows the last-touched parameter's name (e.g. "LP Cutoff", "FM Ratio"). Driven by `setActiveParam`/`activeLabelForKey` (filter labels get the live filter-type prefix) — fed by a delegated `input` listener on `.sidebar` (`ALTER_SLIDER_KEY` map) and by `setTargetValue` (CC/Evolve). **Label text-size slider** `label-size` (`labelSize`/`applyLabelSize`) sizes both the interval and active-param labels.
+- 280px left sidebar, no horizontal scroll. Right preset sidebar is **206px** (`.preset-sidebar`), folds away.
 - Page background color controlled by color picker (sidebar panel color unaffected)
 - FM/AM ratio sliders snap to 31 specific simple fractions: 1/2, 2/3, 1/1, 4/3, 3/2, 5/3, 2/1, 7/3, 5/2, 8/3, 3/1, 10/3, 7/2, 11/3, 4/1, 13/3, 9/2, 14/3, 5/1, 16/3, 11/2, 17/3, 6/1, 19/3, 13/2, 20/3, 7/1, 22/3, 15/2, 23/3, 8/1
 
@@ -103,6 +109,11 @@ A local dev server is configured in `.claude/launch.json`: `python3 -m http.serv
 | `EVOLVE_KEYS`, `evolveInclude`, `readTarget(key)`, `buildEvolveList`, `setAllEvolve` | Evolve registry + UI (reuses `MAP_TARGETS`) |
 | `LFO_TARGET_OPTIONS`, `VEL_RANGES`, `LFO_SYNTH_KEYS` | LFO target list / ranges / wavetable-rebuild keys |
 | recording audio track | `startRecording` taps `recDest` (Web Audio) for internal AND external |
+| `pickVideoMime()` | tries audio-bearing mimes first (mp4+AAC / webm+opus) so recordings have playable audio |
+| `setActiveParam`/`activeLabelForKey`/`ALTER_SLIDER_KEY` | active-parameter readout below interval label |
+| `labelSize`/`applyLabelSize` | text-size slider for interval + active-param labels |
+| `HSL_LFO`, `_lfoGet`/`_lfoSet` | colour (hue/sat/light) LFO routing through `strokeHSL` |
+| `.subsection-fold`/`.subsection-label.foldable` | foldable Warp & Sync subsection |
 | `buildGrid` / `renderGrid` / `renderGridPad(i)` | preset-grid sidebar build + per-pad render |
 | `storeGridPad` / `loadGridPad` / `clearGridPad(i)` | pad store / load / clear |
 | `exportGrid` / `importGrid(obj)` | grid JSON export / import |
