@@ -1,0 +1,4727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lissajous</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0c0e;
+    --panel: #111115;
+    --border: #222228;
+    --accent: #c8f060;
+    --accent2: #60b0f0;
+    --text: #d4d4d8;
+    --muted: #52525b;
+    --label: #a1a1aa;
+    --radius: 4px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    flex-shrink: 0;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  header span {
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+  }
+
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    overflow-x: hidden;   /* never side-scroll — content is sized to fit */
+    /* Fixed panel colour — deliberately independent of the page background so the
+       controls remain readable whatever background colour is chosen. */
+    background: var(--panel);
+  }
+  /* Belt-and-braces: keep every control within the sidebar width. */
+  .sidebar input, .sidebar select, .sidebar button, .sidebar canvas { max-width: 100%; }
+
+  .section-label {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: color 0.15s;
+  }
+  .section-label:hover { color: #d4f472; }
+  .section-label::after {
+    content: '▾';
+    font-size: 10px;
+    opacity: 0.6;
+    transition: transform 0.15s;
+  }
+  /* sub-section headers inside a combined section */
+  .subsection-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin: 16px 0 9px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border);
+  }
+  /* Foldable subsection (e.g. Warp & Sync) inside a section */
+  .subsection-label.foldable { cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; }
+  .subsection-label.foldable::after { content: '▾'; font-size: 9px; opacity: 0.6; transition: transform 0.15s; }
+  .subsection-fold.collapsed .subsection-label.foldable::after { transform: rotate(-90deg); }
+  .subsection-fold.collapsed .subsection-body { display: none; }
+
+  .section.collapsed .section-label { margin-bottom: 0; }
+  .section.collapsed .section-label::after { transform: rotate(-90deg); }
+  .section.collapsed > *:not(.section-label) { display: none !important; }
+
+  /* Each section is a raised card so groups of controls are easy to spot/scan. */
+  .section {
+    background: #15151b;
+    border: 1px solid #2a2a32;
+    border-radius: 7px;
+    padding: 12px 13px 14px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  }
+  .section.collapsed { padding-bottom: 12px; }
+  .section.collapsed:hover { border-color: #3a3a44; }
+  /* The section title bar reads as a header strip across the card. */
+  .section > .section-label {
+    margin: -12px -13px 12px;
+    padding: 10px 13px;
+    border-bottom: 1px solid #2a2a32;
+    background: rgba(200,240,96,0.04);
+    border-radius: 7px 7px 0 0;
+  }
+  .section.collapsed > .section-label {
+    margin-bottom: -12px;
+    border-bottom: none;
+    border-radius: 7px;
+  }
+
+  .lfo-cc-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .lfo-cc-row input[type=checkbox] {
+    accent-color: var(--accent2);
+    cursor: pointer;
+    width: 10px;
+    height: 10px;
+  }
+  .lfo-cc-row input[type=number] {
+    width: 42px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 2px 4px;
+    border-radius: 2px;
+  }
+  .lfo-cc-row input[type=number]:focus { outline: none; border-color: var(--accent2); }
+  .lfo-cc-indicator {
+    margin-left: auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.1s;
+  }
+  .lfo-cc-indicator.active { background: var(--accent2); }
+
+  /* External-input level meter */
+  .ain-meter {
+    flex: 1;
+    height: 8px;
+    background: #050507;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .ain-meter-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    transition: width 0.05s linear;
+  }
+
+  .param-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+
+  .param-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .param-header label {
+    color: var(--label);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+  }
+
+  .param-header .val {
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 500;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 3px;
+    background: #2c2c34;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 0 3px rgba(200,240,96,0.15);
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+
+  input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.35);
+    box-shadow: 0 0 0 4px rgba(200,240,96,0.25);
+  }
+
+  input[type=range]::-moz-range-thumb {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 0 3px rgba(200,240,96,0.15);
+  }
+
+  .wave-toggle {
+    display: flex;
+    gap: 3px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 3px;
+  }
+
+  .wave-btn {
+    flex: 1;
+    padding: 6px 4px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .wave-btn:hover { color: var(--text); }
+
+  .wave-btn.active {
+    background: var(--accent);
+    color: #0c0c0e;
+    font-weight: 500;
+  }
+
+  .wave-preview {
+    display: block;
+    width: 100%;
+    height: 34px;
+    margin-top: 6px;
+  }
+
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    position: relative;
+  }
+
+  #lissajous-canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  .bottom-bar {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .status {
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+  }
+
+  .status span {
+    color: var(--label);
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 7px 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: var(--radius);
+    transition: all 0.15s;
+    border: none;
+  }
+
+  .btn-outline {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--label);
+  }
+
+  .btn-outline:hover {
+    border-color: var(--muted);
+    color: var(--text);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0c0c0e;
+    font-weight: 500;
+  }
+
+  .btn-primary:hover {
+    background: #d4f472;
+  }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .color-row label {
+    color: var(--label);
+    font-size: 11px;
+    flex: 1;
+  }
+
+  input[type=color] {
+    -webkit-appearance: none;
+    width: 28px;
+    height: 20px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: none;
+    cursor: pointer;
+    padding: 1px;
+  }
+
+  input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type=color]::-webkit-color-swatch { border: none; border-radius: 1px; }
+
+  .number-input {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .number-input label {
+    color: var(--label);
+    font-size: 11px;
+    flex: 1;
+  }
+
+  .number-input input[type=number] {
+    width: 52px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 3px 6px;
+    text-align: right;
+  }
+
+  .number-input input[type=number]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  /* hide spinners */
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  input[type=number] { -moz-appearance: textfield; }
+
+
+  .preset-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: 4px;
+  }
+
+  .preset-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 3px 5px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all 0.12s;
+    white-space: nowrap;
+  }
+
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .preset-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(200,240,96,0.07); }
+  .divider { border: none; border-top: 1px solid var(--border); }
+
+  .mod-group {
+    margin-top: 7px;
+    padding: 7px 8px 4px;
+    background: rgba(255,255,255,0.025);
+    border-radius: 3px;
+    border-left: 2px solid var(--border);
+  }
+  .mod-group-label {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: var(--accent2);
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+
+  .vel-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+  }
+  .vel-label {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: var(--accent2);
+    text-transform: uppercase;
+  }
+  .vel-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+  .vel-toggle input[type=checkbox] {
+    accent-color: var(--accent2);
+    cursor: pointer;
+    width: 10px;
+    height: 10px;
+  }
+  .vel-toggle label {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  .vel-toggle input:checked + label {
+    color: var(--accent2);
+  }
+
+  .lfo-panel {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 10px;
+    margin-top: 8px;
+  }
+  .lfo-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 7px;
+    flex-wrap: wrap;
+  }
+  .lfo-num {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    color: var(--accent2);
+    text-transform: uppercase;
+    flex-shrink: 0;
+    margin-right: 2px;
+  }
+  .lfo-wave-toggle {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+  }
+  .lfo-wave-btn {
+    flex: 1;
+    padding: 3px 2px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.12s;
+    text-align: center;
+  }
+  .lfo-wave-btn:hover { color: var(--text); border-color: var(--muted); }
+  .lfo-wave-btn.active { background: rgba(96,176,240,0.15); border-color: var(--accent2); color: var(--accent2); }
+
+  /* Modulator (FM/AM) waveform selector — same look as the LFO wave buttons */
+  .mod-wave-btn {
+    flex: 1;
+    padding: 3px 2px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.12s;
+    text-align: center;
+  }
+  .mod-wave-btn:hover { color: var(--text); border-color: var(--muted); }
+  .mod-wave-btn.active { background: rgba(96,176,240,0.15); border-color: var(--accent2); color: var(--accent2); }
+  .retrig-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    padding: 3px 6px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.12s;
+    flex-shrink: 0;
+  }
+  .retrig-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .retrig-btn.active { border-color: var(--accent2); color: var(--accent2); background: rgba(96,176,240,0.12); }
+  .lfo-targets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 8px;
+    margin-top: 7px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+  }
+  .lfo-targets label {
+    font-size: 9px;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .lfo-targets label:has(input:checked) { color: var(--accent2); }
+  .lfo-targets input[type=checkbox] { accent-color: var(--accent2); cursor: pointer; width: 10px; height: 10px; }
+  header { flex-wrap: wrap; }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+  }
+
+  .checkbox-row input[type=checkbox] { accent-color: var(--accent); cursor: pointer; }
+  .checkbox-row label { color: var(--label); font-size: 11px; cursor: pointer; }
+
+  /* MIDI */
+  .midi-status {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+
+  .midi-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+
+  .midi-dot.connected { background: var(--accent); }
+  .midi-dot.active { background: var(--accent2); }
+  .midi-dot.error { background: #f06060; }
+
+  .midi-status-text {
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .midi-select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--label);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 5px 8px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    appearance: none;
+  }
+
+  .midi-select:focus { outline: none; border-color: var(--muted); }
+
+
+
+
+
+
+  .cc-num-input::-webkit-inner-spin-button,
+  .cc-num-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+
+
+  .midi-ch-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .midi-ch-row label { color: var(--label); font-size: 11px; flex: 1; }
+
+  .midi-ch-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 6px;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .midi-ch-select:focus { outline: none; border-color: var(--accent); }
+
+  /* MIDI mapping */
+  .map-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 8px;
+    margin-bottom: 6px;
+    background: rgba(255,255,255,0.025);
+    border-radius: 3px;
+    border-left: 2px solid var(--border);
+  }
+  .map-row.learning { border-left-color: var(--accent2); }
+  .map-target {
+    flex: 1 1 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 6px;
+    cursor: pointer;
+    appearance: none;
+  }
+  .map-target:focus { outline: none; border-color: var(--accent); }
+  .map-cc-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--label);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    padding: 3px 7px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.12s;
+    white-space: nowrap;
+  }
+  .map-cc-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .map-cc-btn.learning { border-color: var(--accent2); color: var(--accent2); background: rgba(96,176,240,0.12); }
+  .map-cc-btn.bound { color: var(--accent2); border-color: var(--accent2); }
+  .map-range {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 9px;
+    color: var(--muted);
+  }
+  .map-range input {
+    width: 40px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 2px 4px;
+    border-radius: 2px;
+    text-align: right;
+  }
+  .map-range input:focus { outline: none; border-color: var(--accent2); }
+  .map-ind {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.1s;
+  }
+  .map-ind.active { background: var(--accent2); }
+  .map-remove {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    line-height: 1;
+    padding: 2px 6px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .map-remove:hover { border-color: #f06060; color: #f06060; }
+  .map-add-btn {
+    width: 100%;
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    border-radius: 3px;
+    color: var(--label);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 6px;
+    cursor: pointer;
+    transition: all 0.12s;
+    margin-top: 4px;
+  }
+  .map-add-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* manual CC number input inside mapping rows */
+  .map-cc-num {
+    width: 42px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--accent2);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 3px 4px;
+    border-radius: 2px;
+    text-align: center;
+  }
+  .map-cc-num:focus { outline: none; border-color: var(--accent2); }
+  .map-rangecc-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    line-height: 1;
+    padding: 2px 5px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .map-rangecc-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .map-rangecc-btn.open { border-color: var(--accent2); color: var(--accent2); }
+  .map-rangecc {
+    flex: 1 1 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+    margin-top: 4px;
+    padding-top: 5px;
+    border-top: 1px dashed var(--border);
+    font-size: 9px;
+    color: var(--muted);
+  }
+  .map-rangecc label { letter-spacing: 0.06em; }
+
+  /* HSL sliders accent tint */
+  .hsl-row .param-header .val { color: var(--accent2); }
+
+  /* video frame preview overlay */
+  #rec-overlay {
+    position: absolute;
+    border: 1.5px dashed var(--accent);
+    outline: 1px solid rgba(0,0,0,0.5);
+    pointer-events: none;
+    display: none;
+    box-sizing: border-box;
+  }
+  #rec-overlay.active { display: block; }
+  #rec-overlay::after {
+    content: attr(data-label);
+    position: absolute;
+    top: -16px;
+    left: 0;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .rec-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #f06060; display: inline-block;
+    margin-right: 6px;
+  }
+
+  /* sidebar collapse */
+  .sidebar-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--label);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 1;
+    padding: 4px 9px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .sidebar-toggle:hover { border-color: var(--muted); color: var(--text); }
+  .layout.sidebar-hidden .sidebar {
+    width: 0;
+    min-width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right: none;
+    overflow: hidden;
+    opacity: 0;
+  }
+  .sidebar { transition: width 0.2s ease, min-width 0.2s ease, opacity 0.15s ease; }
+
+  /* ── Right-hand session-preset grid sidebar ───────────────────────────── */
+  .preset-sidebar {
+    width: 206px;
+    min-width: 206px;
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.2s ease, min-width 0.2s ease, opacity 0.15s ease;
+  }
+  .layout.grid-hidden .preset-sidebar {
+    width: 0; min-width: 0; border-left: none; opacity: 0;
+  }
+  .preset-sidebar-head {
+    padding: 14px 12px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .preset-sidebar-head .section-label { margin-bottom: 10px; }
+  .grid-mode-row { display: flex; gap: 4px; margin-bottom: 8px; }
+  .grid-mode-row .wave-btn { flex: 1; }
+  .grid-meta-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .grid-meta-row .map-add-btn { flex: 1; }
+  .grid-hint { font-size: 9px; color: var(--muted); line-height: 1.5; }
+  .grid-hint strong { color: var(--accent); }
+  .preset-pad-grid {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: grid;
+    grid-template-columns: repeat(4, 38px);
+    grid-auto-rows: 38px;          /* fixed rows → equal H/V gaps, uniform bottom row */
+    gap: 6px;
+    padding: 10px;
+    justify-content: center;
+    align-content: start;
+  }
+  .grid-pad {
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg);
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: border-color 0.12s, box-shadow 0.12s;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .grid-pad:hover { border-color: var(--muted); color: var(--text); }
+  .grid-pad.filled { color: #0c0c0e; font-weight: 600; }
+  .grid-pad.active { box-shadow: 0 0 0 2px var(--accent) inset; }
+  .grid-pad.unaddressable { opacity: 0.85; }
+
+  /* Header tab that folds the preset grid in/out */
+  .grid-toggle {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--label);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    line-height: 1;
+    padding: 5px 9px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .grid-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .grid-toggle.open { border-color: var(--accent); color: var(--accent); }
+
+  /* Evolve parameter include-list */
+  .evolve-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px 10px;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .evolve-list label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 1px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .evolve-list input[type=checkbox] { accent-color: var(--accent2); cursor: pointer; width: 11px; height: 11px; flex-shrink: 0; }
+  .evolve-list label:has(input:checked) { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="sidebar-toggle" id="sidebar-toggle" title="Collapse / expand sidebar">☰</button>
+  <h1>Lissajous</h1>
+  <span>parametric figure generator</span>
+  <button class="grid-toggle" id="grid-toggle" title="Show / hide preset grid">PRESETS ▸</button>
+</header>
+
+<div class="layout grid-hidden" id="layout">
+  <div class="sidebar">
+
+    <div class="section" id="section-waveform">
+      <div class="section-label">Synthesis</div>
+      <div class="param-row" style="margin-bottom:6px">
+        <div class="param-header"><label>X wave</label></div>
+        <div class="wave-toggle">
+          <button class="wave-btn active" data-axis="x" data-bwave="sine">SIN</button>
+          <button class="wave-btn" data-axis="x" data-bwave="triangle">TRI</button>
+          <button class="wave-btn" data-axis="x" data-bwave="sawtooth">SAW</button>
+          <button class="wave-btn" data-axis="x" data-bwave="square">SQR</button>
+        </div>
+      </div>
+      <div class="param-row" style="margin-bottom:6px">
+        <div class="param-header"><label>Y wave</label></div>
+        <div class="wave-toggle">
+          <button class="wave-btn active" data-axis="y" data-bwave="sine">SIN</button>
+          <button class="wave-btn" data-axis="y" data-bwave="triangle">TRI</button>
+          <button class="wave-btn" data-axis="y" data-bwave="sawtooth">SAW</button>
+          <button class="wave-btn" data-axis="y" data-bwave="square">SQR</button>
+        </div>
+      </div>
+      <canvas class="wave-preview" id="wave-preview" width="208" height="28"></canvas>
+      <button class="map-add-btn" id="btn-export-wav" style="margin-top:8px">⤓ Export Single Cycle WAV</button>
+
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">AM</span></div>
+        <div class="param-row">
+          <div class="param-header"><label>Depth</label><span class="val" id="am-amt-val">0.0</span></div>
+          <input type="range" id="am-amt" min="0" max="1" step="0.01" value="0">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Ratio</label><span class="val" id="am-ratio-val">2/1</span></div>
+          <input type="range" id="am-ratio" min="0" max="30" step="1" value="6">
+        </div>
+        <div class="param-header" style="margin-bottom:4px"><label>Mod shape</label></div>
+        <div class="lfo-wave-toggle">
+          <button class="mod-wave-btn active" data-mod="am" data-mwave="sine">SIN</button>
+          <button class="mod-wave-btn" data-mod="am" data-mwave="triangle">TRI</button>
+          <button class="mod-wave-btn" data-mod="am" data-mwave="sawtooth">SAW</button>
+          <button class="mod-wave-btn" data-mod="am" data-mwave="square">SQR</button>
+        </div>
+      </div>
+
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">FM</span></div>
+        <div class="param-row">
+          <div class="param-header"><label>Amount</label><span class="val" id="fm-amount-val">0.0</span></div>
+          <input type="range" id="fm-amount" min="0" max="8" step="0.1" value="0">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Ratio</label><span class="val" id="fm-ratio-val">2/1</span></div>
+          <input type="range" id="fm-ratio" min="0" max="30" step="1" value="6">
+        </div>
+        <div class="param-header" style="margin-bottom:4px"><label>Mod shape</label></div>
+        <div class="lfo-wave-toggle">
+          <button class="mod-wave-btn active" data-mod="fm" data-mwave="sine">SIN</button>
+          <button class="mod-wave-btn" data-mod="fm" data-mwave="triangle">TRI</button>
+          <button class="mod-wave-btn" data-mod="fm" data-mwave="sawtooth">SAW</button>
+          <button class="mod-wave-btn" data-mod="fm" data-mwave="square">SQR</button>
+        </div>
+      </div>
+
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">Waveshape</span></div>
+        <div class="param-row">
+          <div class="param-header"><label>Drive</label><span class="val" id="shape-amt-val">0.00</span></div>
+          <input type="range" id="shape-amt" min="0" max="1" step="0.01" value="0">
+        </div>
+      </div>
+
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">Wavefold</span></div>
+        <div class="param-row">
+          <div class="param-header"><label>Drive</label><span class="val" id="fold-drive-val">1.0</span></div>
+          <input type="range" id="fold-drive" min="1" max="8" step="0.1" value="1">
+        </div>
+      </div>
+
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">Noise (waveform)</span></div>
+        <div class="param-row">
+          <div class="param-header"><label>Amount</label><span class="val" id="noise-amt-val">0.000</span></div>
+          <input type="range" id="noise-amt" min="0" max="0.1" step="0.001" value="0">
+        </div>
+      </div>
+
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">Filter (final stage)</span></div>
+        <div class="wave-toggle" style="margin-bottom:8px">
+          <button class="wave-btn active" data-filter="lowpass" style="font-size:9px">LP</button>
+          <button class="wave-btn" data-filter="highpass" style="font-size:9px">HP</button>
+          <button class="wave-btn" data-filter="bandpass" style="font-size:9px">BP</button>
+          <button class="wave-btn" data-filter="notch" style="font-size:9px">NOTCH</button>
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Cutoff</label><span class="val" id="filter-freq-val">open</span></div>
+          <input type="range" id="filter-freq" min="0" max="1" step="0.001" value="1">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Resonance</label><span class="val" id="filter-res-val">0.7</span></div>
+          <input type="range" id="filter-res" min="0.1" max="20" step="0.1" value="0.7">
+        </div>
+      </div>
+
+      <div class="subsection-fold collapsed" id="sub-warpsync">
+      <div class="subsection-label foldable">Warp &amp; Sync</div>
+      <div class="subsection-body">
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">PWM (pulse width)</span></div>
+        <div class="param-row">
+          <div class="param-header"><label>Width</label><span class="val" id="pw-amount-val">0.00</span></div>
+          <input type="range" id="pw-amount" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--label);cursor:pointer;margin-top:2px"><input type="checkbox" id="pw-invert" style="accent-color:var(--accent2);cursor:pointer">invert polarity on Y</label>
+      </div>
+
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">Warp (horizontal)</span></div>
+        <div class="param-row">
+          <div class="param-header"><label>Skew</label><span class="val" id="warph-amt-val">0.00</span></div>
+          <input type="range" id="warph-amt" min="-0.5" max="0.5" step="0.01" value="0">
+        </div>
+        <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--label);cursor:pointer;margin-top:2px"><input type="checkbox" id="warph-invert" style="accent-color:var(--accent2);cursor:pointer">invert polarity on Y</label>
+      </div>
+
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">Warp (vertical)</span></div>
+        <div class="param-row">
+          <div class="param-header"><label>Skew</label><span class="val" id="warpv-amt-val">0.00</span></div>
+          <input type="range" id="warpv-amt" min="-1" max="1" step="0.02" value="0">
+        </div>
+        <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--label);cursor:pointer;margin-top:2px"><input type="checkbox" id="warpv-invert" style="accent-color:var(--accent2);cursor:pointer">invert polarity on Y</label>
+      </div>
+
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">Sync</span></div>
+        <div class="param-row">
+          <div class="param-header"><label>Ratio</label><span class="val" id="sync-amt-val">1.00</span></div>
+          <input type="range" id="sync-amt" min="0.1" max="2" step="0.01" value="1">
+        </div>
+        <div style="display:flex;gap:16px;margin-top:2px">
+          <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--label);cursor:pointer"><input type="checkbox" id="sync-hard" checked style="accent-color:var(--accent2);cursor:pointer">hard sync</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--label);cursor:pointer"><input type="checkbox" id="sync-single" style="accent-color:var(--accent2);cursor:pointer">X only</label>
+        </div>
+      </div>
+      </div>
+      </div>
+
+      <div class="subsection-label">Patch</div>
+      <div style="display:flex;gap:6px">
+        <button class="map-add-btn" id="preset-save" style="margin-top:0">⤓ export</button>
+        <button class="map-add-btn" id="preset-load" style="margin-top:0">⤒ import</button>
+      </div>
+      <input type="file" id="preset-file" accept="application/json,.json" style="display:none">
+      <div style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.4">
+        Saves all parameters, LFOs &amp; CC mappings to a .json file.
+      </div>
+
+      <button class="btn btn-outline" id="btn-reset" style="width:100%;margin-top:14px">Reset All</button>
+    </div>
+
+    <div class="section" id="section-axes">
+      <div class="section-label">Frequencies</div>
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">X Axis</span></div>
+        <div class="param-row">
+          <div class="param-header"><label>Amplitude</label><span class="val" id="ax-val">1.00</span></div>
+          <input type="range" id="ax" min="0.1" max="1" step="0.01" value="1">
+        </div>
+        <div class="param-row" id="fx-slider-row">
+          <div class="param-header"><label>Frequency</label><span class="val" id="fx-val">3</span></div>
+          <input type="range" id="fx" min="1" max="16" step="0.5" value="3">
+        </div>
+      </div>
+      <div class="mod-group">
+        <div class="vel-row"><span class="vel-label">Y Axis</span></div>
+        <div class="param-row">
+          <div class="param-header"><label>Amplitude</label><span class="val" id="ay-val">1.00</span></div>
+          <input type="range" id="ay" min="0.1" max="1" step="0.01" value="1">
+        </div>
+        <div class="param-row" id="fy-slider-row">
+          <div class="param-header"><label>Frequency</label><span class="val" id="fy-val">2</span></div>
+          <input type="range" id="fy" min="1" max="16" step="0.5" value="2">
+        </div>
+      </div>
+      <button class="wave-btn" id="xy-swap-btn" style="width:100%;border:1px solid var(--border);border-radius:var(--radius);padding:7px;margin-top:4px">⇄ Swap X / Y</button>
+
+      <div class="subsection-label">Ratio Presets</div>
+      <div class="preset-grid" id="preset-grid"></div>
+
+      <div class="subsection-label">Note Input</div>
+      <div class="wave-toggle" style="margin-bottom:8px">
+        <button class="wave-btn active" id="input-manual-btn" style="font-size:9px">MANUAL</button>
+        <button class="wave-btn" id="input-dual-btn" style="font-size:9px">MIDI</button>
+      </div>
+      <div id="x-note-panel" style="display:none">
+        <div class="midi-ch-row" style="margin-bottom:5px">
+          <label>X MIDI ch</label>
+          <select class="midi-ch-select" id="note-x-ch">
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+            <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+            <option value="7">7</option><option value="8">8</option>
+          </select>
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>X note</label><span class="val" id="x-note-val" style="color:var(--accent2)">—</span></div>
+          <input type="range" id="x-note-slider" min="0" max="11" step="1" value="0">
+        </div>
+      </div>
+      <div id="y-note-panel" style="display:none">
+        <div class="midi-ch-row" style="margin-bottom:5px">
+          <label>Y MIDI ch</label>
+          <select class="midi-ch-select" id="note-y-ch">
+            <option value="1">1</option><option value="2" selected>2</option><option value="3">3</option>
+            <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+            <option value="7">7</option><option value="8">8</option>
+          </select>
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Y note</label><span class="val" id="y-note-val" style="color:var(--accent2)">C</span></div>
+          <input type="range" id="y-note-slider" min="0" max="11" step="1" value="0">
+        </div>
+      </div>
+      <div id="octave-mode-panel" style="display:none;margin-top:8px">
+        <div style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Octave</div>
+        <div class="wave-toggle">
+          <button class="wave-btn active" id="oct-none-btn" style="font-size:9px;padding:5px 3px">NONE</button>
+          <button class="wave-btn" id="oct-full-btn" style="font-size:9px;padding:5px 3px">FULL</button>
+          <button class="wave-btn" id="oct-unison-btn" style="font-size:9px;padding:5px 3px">8VE</button>
+        </div>
+      </div>
+      <div id="note-status-panel" style="display:none;margin-top:8px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="color:var(--label);font-size:11px">Interval</span>
+          <span id="note-interval-display" style="color:var(--label);font-size:11px">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--label);font-size:11px">Ratio</span>
+          <span id="note-ratio-display" style="color:var(--accent);font-size:11px">—</span>
+        </div>
+      </div>
+
+      <div class="subsection-label">MIDI Input</div>
+      <div class="midi-status">
+        <div class="midi-dot" id="midi-dot"></div>
+        <span class="midi-status-text" id="midi-status-text">not connected</span>
+      </div>
+      <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Note / main input</div>
+      <select class="midi-select" id="midi-input-select"><option value="">— no input —</option></select>
+      <div style="margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="color:var(--label);font-size:11px">Base freq</span>
+          <span id="midi-note-display" style="color:var(--accent);font-size:11px">100 Hz</span>
+        </div>
+        <div class="wave-toggle" style="margin-bottom:8px">
+          <button class="wave-btn active" id="basefreq-midi-btn">MIDI</button>
+          <button class="wave-btn" id="basefreq-slider-btn">SLIDER</button>
+        </div>
+        <div id="basefreq-midi-panel">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="color:var(--label);font-size:11px">Last note</span>
+            <span id="midi-note-name" style="color:var(--accent2);font-size:11px">—</span>
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:5px;line-height:1.4">
+            Follows notes on the X-axis channel set in Note Input.
+          </div>
+        </div>
+        <div id="basefreq-slider-panel" style="display:none">
+          <div class="param-row">
+            <div class="param-header"><label>Base Hz</label><span class="val" id="basefreq-val">100 Hz</span></div>
+            <input type="range" id="basefreq-slider" min="10" max="500" step="1" value="100">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="section-midi-map">
+      <div class="section-label">CC Mapping</div>
+      <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Mapping input <span style="text-transform:none">(optional)</span></div>
+      <select class="midi-select" id="midi-map-input-select"><option value="">— same as main —</option></select>
+      <div id="map-list"></div>
+      <button class="map-add-btn" id="map-add">+ add CC mapping</button>
+    </div>
+
+    <div class="section" id="section-audio">
+      <div class="section-label">Audio</div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="audio-enable">
+        <label for="audio-enable">Enable output</label>
+      </div>
+
+      <div class="subsection-label">Source</div>
+      <div class="wave-toggle" style="margin-bottom:8px">
+        <button class="wave-btn active" id="ain-internal-btn" style="font-size:9px">INTERNAL</button>
+        <button class="wave-btn" id="ain-external-btn" style="font-size:9px">EXTERNAL IN</button>
+      </div>
+
+      <!-- Internal generator controls (hidden when external input is selected) -->
+      <div id="ain-internal-controls">
+        <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px">Channel mode</div>
+        <div class="wave-toggle" style="margin-bottom:8px">
+          <button class="wave-btn active" id="audio-stereo-btn" style="font-size:9px">STEREO (X / Y)</button>
+          <button class="wave-btn" id="audio-mono-btn" style="font-size:9px">MONO (X+Y)</button>
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Volume</label><span class="val" id="vol-val">50%</span></div>
+          <input type="range" id="audio-vol" min="0" max="1" step="0.01" value="0.5">
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:2px">
+          <span style="color:var(--muted);font-size:10px;letter-spacing:0.06em">L &nbsp;<span id="audio-fx-hz" style="color:var(--label)">300 Hz</span></span>
+          <span style="color:var(--muted);font-size:10px;letter-spacing:0.06em">R &nbsp;<span id="audio-fy-hz" style="color:var(--label)">200 Hz</span></span>
+        </div>
+      </div>
+
+      <!-- External input controls (hidden when the internal generator is selected) -->
+      <div id="ain-external-controls" style="display:none">
+        <select class="midi-select" id="audio-input-select"><option value="">— select device —</option></select>
+        <button class="map-add-btn" id="ain-refresh" style="margin-top:6px">grant access &amp; list devices</button>
+        <button class="map-add-btn" id="ain-reset" style="margin-top:6px">↻ reset audio engine</button>
+        <div class="midi-status" style="margin-top:8px">
+          <div class="midi-dot" id="ain-dot"></div>
+          <span class="midi-status-text" id="ain-status">internal synth</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:8px">
+          <span style="font-size:9px;letter-spacing:0.08em;color:var(--muted)">IN</span>
+          <div class="ain-meter"><div class="ain-meter-fill" id="ain-meter-fill"></div></div>
+        </div>
+        <div style="font-size:9px;color:var(--muted);margin-top:4px" id="ain-diag"></div>
+        <div class="param-row" style="margin-top:8px">
+          <div class="param-header"><label>Monitor level</label><span class="val" id="ain-gain-val">100%</span></div>
+          <input type="range" id="ain-gain" min="0" max="1" step="0.01" value="1">
+        </div>
+        <div class="checkbox-row" style="margin-top:4px">
+          <input type="checkbox" id="ain-monitor" checked>
+          <label for="ain-monitor">Monitor (hear through speakers)</label>
+        </div>
+        <div style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.5">
+          External input <strong>replaces</strong> the internal generator (exclusive — no
+          mixing) and is captured in video recordings; recording works even with
+          monitoring off. For system/desktop audio pick a loopback device (e.g.
+          BlackHole, Loopback).
+        </div>
+        <div id="ain-protocol-note" style="font-size:9px;color:#f0b060;margin-top:6px;line-height:1.5;display:none"></div>
+      </div>
+    </div>
+
+    <div class="section" id="section-render">
+      <div class="section-label">Figure</div>
+      <div class="color-row"><label>Stroke</label><input type="color" id="stroke-color" value="#c8f060"></div>
+      <div class="param-row hsl-row">
+        <div class="param-header"><label>Hue</label><span class="val" id="hsl-h-val">79</span></div>
+        <input type="range" id="hsl-h" min="0" max="360" step="1" value="79">
+      </div>
+      <div class="param-row hsl-row">
+        <div class="param-header"><label>Saturation</label><span class="val" id="hsl-s-val">84</span></div>
+        <input type="range" id="hsl-s" min="0" max="100" step="1" value="84">
+      </div>
+      <div class="param-row hsl-row">
+        <div class="param-header"><label>Luminosity</label><span class="val" id="hsl-l-val">66</span></div>
+        <input type="range" id="hsl-l" min="0" max="100" step="1" value="66">
+      </div>
+      <div class="color-row"><label>Background</label><input type="color" id="bg-color" value="#0c0c0e"></div>
+      <div class="param-row">
+        <div class="param-header"><label>Line width</label><span class="val" id="line-width-val">1.5</span></div>
+        <input type="range" id="line-width" min="0.5" max="8" step="0.1" value="1.5">
+      </div>
+      <div class="param-row">
+        <div class="param-header"><label>Dots ↔ Line</label><span class="val" id="dots-line-val">line</span></div>
+        <input type="range" id="dots-line" min="0" max="1" step="0.01" value="1">
+      </div>
+      <div class="number-input"><label>Resolution</label><input type="number" id="resolution" value="2000" min="100" max="10000" step="100"></div>
+
+      <div class="param-row" style="margin-top:12px">
+        <div class="param-header"><label>δ (phase position)</label><span class="val" id="phase-val">0.50π</span></div>
+        <input type="range" id="phase" min="0" max="2" step="0.01" value="0.5">
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="phase-modulators">
+        <label for="phase-modulators">Phase rotates FM/AM modulators</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="animate" checked>
+        <label for="animate">Animate phase</label>
+      </div>
+      <div class="param-row" id="anim-speed-row">
+        <div class="param-header"><label>Speed</label><span class="val" id="speed-val">1.0×</span></div>
+        <input type="range" id="anim-speed" min="0.1" max="5" step="0.1" value="1">
+      </div>
+      <div class="checkbox-row" style="margin-top:6px">
+        <input type="checkbox" id="construction-view" checked>
+        <label for="construction-view">Construction view</label>
+      </div>
+      <div id="construction-controls" class="mod-group" style="margin-top:6px">
+        <div class="param-row">
+          <div class="param-header"><label>Trace tempo</label><span class="val" id="trace-speed-val">1.0×</span></div>
+          <input type="range" id="trace-speed" min="0" max="5" step="0.1" value="1">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Untraced opacity</label><span class="val" id="untraced-alpha-val">20%</span></div>
+          <input type="range" id="untraced-alpha" min="0" max="1" step="0.01" value="0.2">
+        </div>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="show-interval" checked>
+        <label for="show-interval">Show interval label</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="show-active-param">
+        <label for="show-active-param">Show active parameter</label>
+      </div>
+      <div class="param-row">
+        <div class="param-header"><label>Label text size</label><span class="val" id="label-size-val">11 px</span></div>
+        <input type="range" id="label-size" min="8" max="40" step="1" value="11">
+      </div>
+
+      <button class="btn btn-primary" id="btn-export" style="width:100%;margin-top:12px">Export SVG</button>
+    </div>
+
+    <div class="section" id="section-video">
+      <div class="section-label">Video</div>
+      <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px">Aspect ratio</div>
+      <div class="wave-toggle" style="margin-bottom:8px">
+        <button class="wave-btn active" data-aspect="1:1" style="font-size:9px">1:1</button>
+        <button class="wave-btn" data-aspect="4:5" style="font-size:9px">4:5</button>
+        <button class="wave-btn" data-aspect="16:9" style="font-size:9px">16:9</button>
+        <button class="wave-btn" data-aspect="9:16" style="font-size:9px">9:16</button>
+      </div>
+      <div class="param-row">
+        <div class="param-header"><label>Zoom</label><span class="val" id="rec-zoom-val">1.00×</span></div>
+        <input type="range" id="rec-zoom" min="0.6" max="4" step="0.01" value="1">
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="rec-show-frame">
+        <label for="rec-show-frame">Show frame preview</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="rec-include-construction">
+        <label for="rec-include-construction">Include construction view</label>
+      </div>
+      <button class="map-add-btn" id="rec-toggle" style="margin-top:8px">● record</button>
+      <div id="rec-status" style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.4"></div>
+    </div>
+
+    <div class="section" id="section-lfos">
+      <div class="section-label">LFOs</div>
+      <div id="lfo-list"></div>
+    </div>
+
+    <div class="section" id="section-evolve">
+      <div class="section-label">Evolve</div>
+      <button class="btn btn-primary" id="evolve-mutate" style="width:100%">⚇ Mutate</button>
+      <div class="param-row" style="margin-top:10px">
+        <div class="param-header"><label>Deviation</label><span class="val" id="evolve-dev-val">30%</span></div>
+        <input type="range" id="evolve-dev" min="0" max="1" step="0.01" value="0.3">
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin:2px 0 10px;line-height:1.4">
+        How far each mutation strays from the current value. At 100% every included
+        parameter is fully randomised.
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="map-add-btn" id="evolve-all" style="margin-top:0">select all</button>
+        <button class="map-add-btn" id="evolve-none" style="margin-top:0">deselect all</button>
+      </div>
+      <div class="evolve-list" id="evolve-list"></div>
+      <button class="btn btn-outline" id="evolve-reset" style="width:100%;margin-top:12px">↺ Reset to defaults</button>
+    </div>
+
+  </div>
+
+  <div class="canvas-area">
+    <canvas id="lissajous-canvas" width="700" height="700"></canvas>
+    <div id="rec-overlay" data-label=""></div>
+    <div id="interval-label" style="
+      position:absolute;
+      bottom:36px;
+      left:50%;
+      transform:translateX(-50%);
+      font-family:'IBM Plex Mono',monospace;
+      font-size:11px;
+      letter-spacing:0.12em;
+      color:rgba(255,255,255,0.35);
+      pointer-events:none;
+      white-space:nowrap;
+    "></div>
+    <div id="active-param-label" style="
+      position:absolute;
+      bottom:14px;
+      left:50%;
+      transform:translateX(-50%);
+      font-family:'IBM Plex Mono',monospace;
+      font-size:11px;
+      letter-spacing:0.12em;
+      color:var(--accent);
+      pointer-events:none;
+      white-space:nowrap;
+      display:none;
+    "></div>
+  </div>
+
+  <div class="preset-sidebar" id="preset-sidebar">
+    <div class="preset-sidebar-head">
+      <div class="section-label" style="cursor:default">Session Presets</div>
+      <div class="grid-mode-row">
+        <button class="wave-btn active" id="grid-mode-load" style="font-size:9px">LOAD</button>
+        <button class="wave-btn" id="grid-mode-store" style="font-size:9px">STORE</button>
+      </div>
+      <div class="grid-meta-row">
+        <label style="font-size:9px;letter-spacing:0.08em;color:var(--muted)">MIDI ch</label>
+        <select class="midi-select" id="grid-channel" style="width:auto;flex:1"></select>
+      </div>
+      <div class="grid-meta-row">
+        <button class="map-add-btn" id="grid-export" style="margin-top:0">⤓ export</button>
+        <button class="map-add-btn" id="grid-import" style="margin-top:0">⤒ import</button>
+      </div>
+      <div class="grid-hint" id="grid-hint">Pads play from <strong>C1</strong>. STORE-click saves the current patch; right-click clears.</div>
+      <input type="file" id="grid-file" accept="application/json,.json" style="display:none">
+    </div>
+    <div class="preset-pad-grid" id="preset-pad-grid"></div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <div class="status">
+    <span>fx</span> <span id="status-fx">3</span> &nbsp;/&nbsp;
+    <span>fy</span> <span id="status-fy">2</span> &nbsp;/&nbsp;
+    <span>δ</span> <span id="status-phase">0.50π</span>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('lissajous-canvas');
+const ctx = canvas.getContext('2d');
+const waveCanvas = document.getElementById('wave-preview');
+const waveCtx = waveCanvas.getContext('2d');
+
+let waveTypeX = 'sine';
+let waveTypeY = 'sine';
+let params = {
+  ax: 1, fx: 3,
+  ay: 1, fy: 2,
+  phase: 0.5,
+  strokeColor: '#c8f060',
+  bgColor: '#0c0c0e',
+  lineWidth: 1.5,
+  resolution: 2000,
+  fmAmount: 0,    // frequency modulation depth
+  fmRatio: 2,     // frequency modulation ratio
+  fmWave: 'sine', // FM modulator waveform
+  pwAmount: 0,    // pulse-width modulation (-1..1, 0 = 50% duty)
+  shapeAmt: 0,    // waveshaping (tanh) drive
+  warpH: 0,       // horizontal warp / phase skew (-0.5..0.5)
+  warpV: 0,       // vertical skew (-1..1)
+  syncAmt: 1,     // sync ratio (1 = off), range 0.1..2.0
+  foldDrive: 1,
+  amAmt: 0,
+  amRatio: 2,
+  amWave: 'sine', // AM modulator waveform
+  noiseAmt: 0,    // additive noise amount on the waveform (0..0.1)
+  filterCutoff: 1, // waveform filter cutoff 0..1 (1 = fully open / off)
+  filterQ: 0.7,    // waveform filter resonance / Q
+  dotsLine: 1,     // 1 = continuous line, <1 = dotted (lower = sparser dots)
+  traceSpeed: 1,      // construction view: figure-tracing tempo (independent of phase anim speed)
+  untracedAlpha: 0.2, // construction view: opacity of the not-yet-traced background figure
+};
+// Snapshot of starting values (for double-click reset / Reset All / MIDI disconnect)
+const PARAM_DEFAULTS = JSON.parse(JSON.stringify(params));
+
+let visualSwap = false; // swaps X/Y in the visual presentation only
+let syncHard = true;    // true = hard sync (phase reset), false = soft sync (reflect)
+let syncSingle = false; // true = sync affects the X axis only
+// When set, the effect is applied with inverted polarity on the Y axis (opposite
+// to X) instead of identically to both axes.
+let pwInvert = false;
+let warpHInvert = false;
+let warpVInvert = false;
+
+// Output multimode filter
+let filterType = 'lowpass';            // lowpass | highpass | bandpass | notch
+let phaseModulators = false;           // phase rotation also offsets FM/AM modulators
+// The multimode filter is the LAST STAGE OF THE WAVEFORM (not an audio node): it is
+// applied to the per-axis sample sequences, so it reshapes the figure, the wave
+// preview and the audio wavetable identically. Cutoff is in harmonics of each
+// axis's own waveform, so the effect is consistent across all three.
+const FILTER_MAX_HARMONICS = 256;
+function filterHarmonics() { return Math.pow(FILTER_MAX_HARMONICS, params.filterCutoff); } // 1..256
+function filterIsOn() { return params.filterCutoff < 0.999; }
+// RBJ biquad coefficients (normalised, a0 folded in). w0 = 2π·Fc/Fs.
+function biquadCoeffs(type, w0, Q) {
+  w0 = Math.max(1e-4, Math.min(Math.PI * 0.99, w0));
+  const cw = Math.cos(w0), sw = Math.sin(w0), alpha = sw / (2 * Math.max(0.05, Q));
+  let b0, b1, b2; const a0 = 1 + alpha, a1 = -2 * cw, a2 = 1 - alpha;
+  if (type === 'highpass')      { b0 = (1 + cw) / 2; b1 = -(1 + cw); b2 = (1 + cw) / 2; }
+  else if (type === 'bandpass') { b0 = alpha;        b1 = 0;          b2 = -alpha; }
+  else if (type === 'notch')    { b0 = 1;            b1 = -2 * cw;    b2 = 1; }
+  else                          { b0 = (1 - cw) / 2; b1 = 1 - cw;     b2 = (1 - cw) / 2; }
+  return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 };
+}
+// In-place biquad over a periodic sequence: pass 1 settles state across the loop
+// point, pass 2 writes the steady-state output.
+function filterPeriodic(arr, n, c) {
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < n; i++) { const x0 = arr[i]; const y0 = c.b0*x0 + c.b1*x1 + c.b2*x2 - c.a1*y1 - c.a2*y2; x2 = x1; x1 = x0; y2 = y1; y1 = y0; }
+  for (let i = 0; i < n; i++) { const x0 = arr[i]; const y0 = c.b0*x0 + c.b1*x1 + c.b2*x2 - c.a1*y1 - c.a2*y2; x2 = x1; x1 = x0; y2 = y1; y1 = y0; arr[i] = y0; }
+}
+// Reusable buffers for the figure's per-axis sample sequences.
+let _figBufX = new Float64Array(0), _figBufY = new Float64Array(0);
+let _audioSampling = false; // true while sampling processWave for audio (skips visual noise)
+
+let animating = true;
+let animSpeed = 1;
+let animPhase = 0;
+let raf;
+
+// Wave functions
+function waveFn(t, type) {
+  switch (type) {
+    case 'sine': return Math.sin(t);
+    case 'triangle': {
+      const p = (t / Math.PI) % 2;
+      const n = ((p % 2) + 2) % 2;
+      return n < 1 ? 2 * n - 1 : 3 - 2 * n;
+    }
+    case 'sawtooth': {
+      const frac = ((t / (2 * Math.PI)) % 1 + 1) % 1;
+      return 2 * frac - 1;
+    }
+    case 'square': {
+      const s = Math.sin(t);
+      return s >= 0 ? 1 : -1;
+    }
+    default: return Math.sin(t);
+  }
+}
+
+// Wavefold: reflect signal at ±1 with triangle-wave mapping
+function foldValue(x) {
+  x = x % 4;
+  if (x < 0) x += 4;
+  if (x < 1) return x;
+  if (x < 3) return 2 - x;
+  return x - 4;
+}
+
+const TWO_PI = Math.PI * 2;
+
+// Pulse-width / duty-cycle remap of a normalised phase p∈[0,1).
+// width ∈ (0,1): the first half-cycle is compressed/expanded so the duty point
+// moves away from 0.5. width 0.5 = identity.
+function pwmPhase(p, width) {
+  if (p < width) return 0.5 * (p / width);
+  return 0.5 + 0.5 * (p - width) / (1 - width);
+}
+
+// Full modulation chain:
+//   FM (phase) → Sync → horizontal warp (phase skew) → PWM (duty) → base wave →
+//   vertical skew → waveshape → fold → AM → noise
+// `axis` ('x' | 'y') lets per-axis effects (sync "X only") know which side they're on.
+function processWave(carrierArg, freqT, type, axis) {
+  type = type || waveTypeX;
+  axis = axis || 'x';
+  // Per-effect polarity: when "invert" is on, the Y axis gets the negated value so
+  // the two axes warp/PWM in opposite directions instead of identically.
+  const inv = (axis === 'y') ? -1 : 1;
+  const pwAmt  = params.pwAmount * (pwInvert    ? inv : 1);
+  const warpHv = params.warpH    * (warpHInvert ? inv : 1);
+  const warpVv = params.warpV    * (warpVInvert ? inv : 1);
+  // When enabled, the phase offset baked into the carrier (carrierArg − freqT, i.e.
+  // δ·π on the X axis) is also added to the FM/AM modulator phases, so the
+  // modulators rotate with the phase animation/parameter just like the carrier.
+  const modPhase = phaseModulators ? (carrierArg - freqT) : 0;
+  let ph = carrierArg;
+  // Frequency Modulation: true-FM style, index scales with 1/ratio
+  if (params.fmAmount > 0.0001) ph += (params.fmAmount / params.fmRatio) * waveFn(params.fmRatio * freqT + modPhase, params.fmWave);
+  // Sync: hard (phase reset) or soft (triangle reflect) at the synced ratio.
+  // Optionally affects the X axis only.
+  if (Math.abs(params.syncAmt - 1) > 0.001 && (!syncSingle || axis === 'x')) {
+    const q = (ph / TWO_PI) * params.syncAmt;
+    let phf;
+    if (syncHard) {
+      phf = q - Math.floor(q);                       // hard reset (discontinuous)
+    } else {
+      const m = ((q % 2) + 2) % 2;                    // soft: reflect → continuous
+      phf = m < 1 ? m : 2 - m;
+    }
+    ph = phf * TWO_PI;
+  }
+  // Horizontal warp: smooth phase skew (leans the waveform left/right)
+  if (warpHv > 0.0005 || warpHv < -0.0005) ph = ph + warpHv * Math.sin(ph);
+  // Pulse-width modulation: shift the cycle's duty point (most audible on square)
+  if (pwAmt > 0.0005 || pwAmt < -0.0005) {
+    let p = (ph / TWO_PI) % 1; if (p < 0) p += 1;
+    const width = 0.5 + 0.49 * pwAmt;   // 0.005 .. 0.995
+    ph = pwmPhase(p, width) * TWO_PI;
+  }
+  // Base wave
+  let s = waveFn(ph, type);
+  // Vertical skew (parabolic vertical lean, peaks preserved)
+  if (warpVv > 0.001 || warpVv < -0.001) s = s + warpVv * (1 - s * s);
+  // Waveshaping (tanh saturation), normalised
+  if (params.shapeAmt > 0.001) { const k = 1 + params.shapeAmt * 6; s = Math.tanh(s * k) / Math.tanh(k); }
+  // Fold
+  if (params.foldDrive > 1.001) s = foldValue(s * params.foldDrive);
+  // AM (normalized)
+  if (params.amAmt > 0.001) s = s * (1 + params.amAmt * waveFn(params.amRatio * freqT + modPhase, params.amWave)) / (1 + params.amAmt);
+  // Noise — visual only; live audio gets a dedicated white-noise source so the
+  // periodic wavetable stays clean/periodic.
+  if (!_audioSampling && params.noiseAmt > 0.001) s += params.noiseAmt * (Math.random() * 2 - 1);
+  return s;
+}
+
+// Combined modulation "complexity" — drives adaptive resolution.
+function modComplexity() {
+  return 1
+    + params.fmAmount * params.fmRatio * 0.12
+    + Math.abs(params.pwAmount) * 1.5
+    + (params.syncAmt - 1) * 0.5
+    + params.shapeAmt * 1.0
+    + Math.abs(params.warpH) * 1.0
+    + Math.abs(params.warpV) * 0.5
+    + (params.foldDrive - 1) * 0.25
+    + params.amAmt * params.amRatio * 0.08;
+}
+
+function drawLissajous(targetCtx, w, h, phase, resolution, zoom) {
+  const { ax, fx, ay, fy, strokeColor, bgColor, lineWidth } = params;
+  zoom = zoom || 1;
+  // Base resolution from user setting (or override from caller)
+  const baseRes = resolution ?? params.resolution;
+  const periodFactor = lcm(fx, fy) / Math.min(fx, fy);
+  const modCx = modComplexity();
+  const minPts = Math.ceil(Math.max(fx, fy) * periodFactor * 80 * Math.min(modCx, 10));
+  resolution = Math.min(Math.max(baseRes, minPts), 160000);
+  targetCtx.fillStyle = bgColor;
+  targetCtx.fillRect(0, 0, w, h);
+
+  const cx = w / 2, cy = h / 2;
+  const pad = Math.min(w, h) * 0.034;
+  const rx = (w / 2 - pad) * ax * zoom;
+  const ry = (h / 2 - pad) * ay * zoom;
+
+  // Build the per-axis sample sequences first so the filter (a waveform stage) can
+  // process them before they're drawn.
+  const N = resolution + 1;
+  if (_figBufX.length < N) { _figBufX = new Float64Array(N); _figBufY = new Float64Array(N); }
+  const sxArr = _figBufX, syArr = _figBufY;
+  const span = Math.PI * 2 * lcm(fx, fy) / Math.min(fx, fy);
+  for (let i = 0; i <= resolution; i++) {
+    const t = (i / resolution) * span;
+    sxArr[i] = processWave(fx * t + phase * Math.PI, fx * t, waveTypeX, 'x');
+    syArr[i] = processWave(fy * t, fy * t, waveTypeY, 'y');
+  }
+
+  // ── Multimode filter (final waveform stage) ──────────────────────────────────
+  if (filterIsOn()) {
+    const HC = filterHarmonics();
+    const cyclesX = fx * periodFactor, cyclesY = fy * periodFactor;
+    const wX = Math.PI * 2 * Math.min(0.49, (HC * cyclesX) / resolution);
+    const wY = Math.PI * 2 * Math.min(0.49, (HC * cyclesY) / resolution);
+    filterPeriodic(sxArr, N, biquadCoeffs(filterType, wX, params.filterQ));
+    filterPeriodic(syArr, N, biquadCoeffs(filterType, wY, params.filterQ));
+  }
+
+  targetCtx.strokeStyle = strokeColor;
+  targetCtx.fillStyle = strokeColor;
+  targetCtx.lineWidth = lineWidth;
+  targetCtx.lineJoin = 'round';
+  targetCtx.lineCap = 'round';
+
+  const dl = params.dotsLine ?? 1;
+  if (dl >= 0.999) {
+    // Continuous line (full resolution).
+    targetCtx.beginPath();
+    for (let i = 0; i <= resolution; i++) {
+      const x = cx + rx * (visualSwap ? syArr[i] : sxArr[i]);
+      const y = cy + ry * (visualSwap ? sxArr[i] : syArr[i]);
+      i === 0 ? targetCtx.moveTo(x, y) : targetCtx.lineTo(x, y);
+    }
+    targetCtx.stroke();
+  } else {
+    // Dotted: subsample the curve. Density grows with the slider until the dots
+    // merge back into the continuous line.
+    const dotCount = Math.max(10, Math.round(12 * Math.pow(560, dl)));  // ~12 … ~6700
+    const r = Math.max(0.8, lineWidth);
+    for (let k = 0; k < dotCount; k++) {
+      const idx = Math.round((k / dotCount) * resolution);
+      const x = cx + rx * (visualSwap ? syArr[idx] : sxArr[idx]);
+      const y = cy + ry * (visualSwap ? sxArr[idx] : syArr[idx]);
+      targetCtx.beginPath();
+      targetCtx.arc(x, y, r, 0, Math.PI * 2);
+      targetCtx.fill();
+    }
+  }
+}
+
+function gcd(a, b) { return b < 0.01 ? a : gcd(b, a % b); }
+function lcm(a, b) { return (a * b) / gcd(a, b); }
+
+function drawWavePreview() {
+  // Match the backing store to the element's rendered size so the trace fills the
+  // box exactly (the box is now fluid-width, sized by CSS to the sidebar).
+  const cssW = waveCanvas.clientWidth || waveCanvas.width;
+  const cssH = waveCanvas.clientHeight || waveCanvas.height;
+  if (waveCanvas.width !== cssW)  waveCanvas.width = cssW;
+  if (waveCanvas.height !== cssH) waveCanvas.height = cssH;
+  const w = waveCanvas.width, h = waveCanvas.height;
+  waveCtx.fillStyle = '#0c0c0e';
+  waveCtx.fillRect(0, 0, w, h);
+  const CYC = 2;                         // preview shows 2 cycles
+  // Build, filter (same waveform stage as the figure), then plot each axis.
+  const drawAxis = (type, axis, color, lw) => {
+    const n = w + 1;
+    const buf = new Float64Array(n);
+    for (let i = 0; i <= w; i++) { const t = (i / w) * Math.PI * 2 * CYC; buf[i] = processWave(t, t, type, axis); }
+    if (filterIsOn()) {
+      const wc = Math.PI * 2 * Math.min(0.49, (filterHarmonics() * CYC) / w);
+      filterPeriodic(buf, n, biquadCoeffs(filterType, wc, params.filterQ));
+    }
+    waveCtx.beginPath();
+    for (let i = 0; i <= w; i++) {
+      const y = h / 2 - buf[i] * (h / 2 - 3);
+      i === 0 ? waveCtx.moveTo(i, y) : waveCtx.lineTo(i, y);
+    }
+    waveCtx.strokeStyle = color; waveCtx.lineWidth = lw; waveCtx.stroke();
+  };
+  drawAxis(waveTypeY, 'y', '#60b0f0', 1);    // Y dimmer, behind
+  drawAxis(waveTypeX, 'x', '#c8f060', 1.5);  // X in front
+}
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+function hexToRgba(hex, alpha) {
+  const h = hex.replace('#','');
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ── Mode 4 ───────────────────────────────────────────────────────────────────
+let mode4T = 0;
+let _m4BufX = new Float64Array(0), _m4BufY = new Float64Array(0);
+
+function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
+  const { ax, fx, ay, fy, strokeColor, bgColor, lineWidth } = params;
+  // phase passed in from render loop (animated)
+
+  const margin = Math.round(Math.min(w, h) * 0.2);
+  const pad    = 12;
+
+  // Layout: figure bottom-right, X wave along the top strip, Y wave down the left.
+  const figX = margin, figY = margin;
+  const figW = w - margin, figH = h - margin;
+  const cx = figX + figW / 2, cy = figY + figH / 2;
+  const rx = (figW / 2 - pad) * ax;
+  const ry = (figH / 2 - pad) * ay;
+
+  // True fundamental period so cycle counts read correctly (e.g. 2:1 → 2 & 1).
+  const T = TWO_PI / gcd(fx, fy);
+  const t = mode4T;
+
+  const res = Math.min(Math.max(params.resolution, Math.ceil(Math.max(fx, fy) * 96)), 40000);
+
+  // Background
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, w, h);
+
+  // Separator lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(margin, 0); ctx.lineTo(margin, margin); ctx.lineTo(0, margin);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(margin, 0); ctx.lineTo(margin, h);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, margin); ctx.lineTo(w, margin);
+  ctx.stroke();
+
+  // Rotated strip mapping: time runs along the LONG axis (figure width / height)
+  // so the waveform isn't squeezed; amplitude runs across the narrow strip.
+  const stripAmp = margin / 2 - 6;
+  const xMid = margin / 2;   // vertical centre of the top strip
+  const yMid = margin / 2;   // horizontal centre of the left strip
+  const xWaveX = τ   => figX + (τ / T) * figW;                 // top strip: time → x
+  const xWaveY = amp => xMid - amp * stripAmp;                 // top strip: amp → y
+  const yWaveY = τ   => figY + (τ / T) * figH;                 // left strip: time → y
+  const yWaveX = amp => yMid - amp * stripAmp;                 // left strip: amp → x
+
+  // Build filtered per-axis sample arrays over the fundamental period T so the
+  // construction view reflects EVERY waveform stage — including the multimode filter,
+  // sync, warps, PWM, fold, AM, noise — exactly like the main view (drawLissajous).
+  // Previously the strips/figure sampled processWave on the fly and skipped the
+  // filter, so the construction view drifted from the real figure.
+  const N = res + 1;
+  if (_m4BufX.length < N) { _m4BufX = new Float64Array(N); _m4BufY = new Float64Array(N); }
+  const ampXArr = _m4BufX, ampYArr = _m4BufY;
+  for (let i = 0; i <= res; i++) {
+    const τ = (i / res) * T;
+    ampXArr[i] = processWave(fx * τ + phase * Math.PI, fx * τ, waveTypeX, 'x');
+    ampYArr[i] = processWave(fy * τ, fy * τ, waveTypeY, 'y');
+  }
+  if (filterIsOn()) {
+    const HC = filterHarmonics();
+    const g = gcd(fx, fy);
+    const cyclesX = fx / g, cyclesY = fy / g;   // waveform cycles within one period T
+    const wX = Math.PI * 2 * Math.min(0.49, (HC * cyclesX) / res);
+    const wY = Math.PI * 2 * Math.min(0.49, (HC * cyclesY) / res);
+    filterPeriodic(ampXArr, N, biquadCoeffs(filterType, wX, params.filterQ));
+    filterPeriodic(ampYArr, N, biquadCoeffs(filterType, wY, params.filterQ));
+  }
+  // X/Y swap mirrors the main view; sample the filtered arrays by time.
+  const idxAt = τ => { let k = Math.round((τ / T) * res); return k < 0 ? 0 : (k > res ? res : k); };
+  const hAt = τ => visualSwap ? ampYArr[idxAt(τ)] : ampXArr[idxAt(τ)];
+  const vAt = τ => visualSwap ? ampXArr[idxAt(τ)] : ampYArr[idxAt(τ)];
+
+  // ── Full horizontal wave: top strip (time horizontal, amplitude vertical)
+  ctx.beginPath();
+  for (let i = 0; i <= res; i++) {
+    const τ = (i / res) * T;
+    const amp = hAt(τ);
+    const xp = xWaveX(τ), yp = xWaveY(amp);
+    i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
+  }
+  ctx.strokeStyle = hexToRgba(strokeColor, 0.45);
+  ctx.lineWidth = lineWidth * 0.8;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // ── Full vertical wave: left strip (time vertical, amplitude horizontal)
+  ctx.beginPath();
+  for (let i = 0; i <= res; i++) {
+    const τ = (i / res) * T;
+    const amp = vAt(τ);
+    const xp = yWaveX(amp), yp = yWaveY(τ);
+    i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
+  }
+  ctx.strokeStyle = hexToRgba(strokeColor, 0.45);
+  ctx.lineWidth = lineWidth * 0.8;
+  ctx.stroke();
+
+  // ── Full Lissajous (dim background = the untraced part), honouring Dots ↔ Line
+  const dl = params.dotsLine ?? 1;
+  const untracedCol = hexToRgba(strokeColor, Math.max(0, Math.min(1, params.untracedAlpha)));
+  if (dl >= 0.999) {
+    ctx.beginPath();
+    for (let i = 0; i <= res; i++) {
+      const τ = (i / res) * T;
+      const xp = cx + rx * hAt(τ);
+      const yp = cy + ry * vAt(τ);
+      i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
+    }
+    ctx.strokeStyle = untracedCol;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  } else {
+    // Same dot density mapping as the main view (drawLissajous).
+    const dotCount = Math.max(10, Math.round(12 * Math.pow(560, dl)));
+    const r = Math.max(0.8, lineWidth);
+    ctx.fillStyle = untracedCol;
+    for (let k = 0; k < dotCount; k++) {
+      const τ = (k / dotCount) * T;
+      const xp = cx + rx * hAt(τ);
+      const yp = cy + ry * vAt(τ);
+      ctx.beginPath(); ctx.arc(xp, yp, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // ── Current positions
+  const xAmpNow = hAt(t);
+  const yAmpNow = vAt(t);
+  const figPx = cx + rx * xAmpNow;
+  const figPy = cy + ry * yAmpNow;
+  const xDotX = xWaveX(t), xDotY = xWaveY(xAmpNow); // dot on top strip
+  const yDotX = yWaveX(yAmpNow), yDotY = yWaveY(t); // dot on left strip
+
+  // ── Projection lines (dashed): from each strip's moving dot to the figure point
+  ctx.setLineDash([3, 5]);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = hexToRgba(strokeColor, 0.3);
+  ctx.beginPath(); ctx.moveTo(xDotX, xDotY); ctx.lineTo(figPx, figPy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(yDotX, yDotY); ctx.lineTo(figPx, figPy); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── Bright trail (0 → t, current cycle)
+  if (t > 0.0001) {
+    const trailRes = Math.max(4, Math.ceil(res * (t / T)));
+    ctx.beginPath();
+    for (let i = 0; i <= trailRes; i++) {
+      const τ = (i / trailRes) * t;
+      const xp = cx + rx * hAt(τ);
+      const yp = cy + ry * vAt(τ);
+      i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
+    }
+    ctx.strokeStyle = hexToRgba(strokeColor, 0.85);
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  }
+
+  // ── Dots
+  ctx.fillStyle = strokeColor;
+  ctx.beginPath(); ctx.arc(xDotX, xDotY, 4, 0, Math.PI*2); ctx.fill(); // x strip
+  ctx.beginPath(); ctx.arc(yDotX, yDotY, 4, 0, Math.PI*2); ctx.fill(); // y strip
+  ctx.beginPath(); ctx.arc(figPx, figPy, 5.5, 0, Math.PI*2); ctx.fill(); // figure
+
+  // ── Advance time (tracing tempo is independent of the phase-animation speed)
+  mode4T = (mode4T + T * (params.traceSpeed ?? 1) * 0.003) % T;
+}
+
+
+// MIDI target state — CC handler writes here only, never touches params or DOM
+const midiTarget = {};
+let midiLastAt = 0;
+const MIDI_ACTIVE_MS = 150;
+// RES_MIDI removed — use adaptive resolution even during MIDI
+const RES_NORMAL = () => params.resolution;
+const FRAME_MS = 1000 / 60;
+let lastDrawAt = 0;
+
+let domDirty = false;
+let domLastSyncAt = 0;
+
+function render(now) {
+  raf = requestAnimationFrame(render);
+
+  if (now - lastDrawAt < FRAME_MS - 1) return;
+  const lfodt = Math.min((now - lastDrawAt) / 1000, 0.1); // actual elapsed seconds, clamped
+  lastDrawAt = now;
+
+  updateDot(now);
+  updateInputMeter(now);
+
+  const midiActive = (now - midiLastAt) < MIDI_ACTIVE_MS;
+
+  if (midiActive) {
+    let freqChanged = false;
+    Object.keys(midiTarget).forEach(key => {
+      if (params[key] !== undefined) {
+        if ((key === 'fx' || key === 'fy') && params[key] !== midiTarget[key]) freqChanged = true;
+        params[key] = midiTarget[key];
+      }
+    });
+    if (freqChanged) syncAudioParams();
+    domDirty = true;
+  } else {
+    // MIDI idle — purge targets so manual controls are no longer overwritten
+    if (Object.keys(midiTarget).length) {
+      Object.keys(midiTarget).forEach(key => delete midiTarget[key]);
+      domDirty = true;
+    }
+  }
+
+  // Flush DOM updates (throttled) — runs during and after MIDI activity
+  if (domDirty && (now - domLastSyncAt) > 50) {
+    domDirty = false;
+    domLastSyncAt = now;
+    Object.keys(SLIDER_IDS).forEach(key => {
+      const v = params[key];
+      if (v === undefined) return;
+      document.getElementById(SLIDER_IDS[key]).value = v;
+      const disp = DISPLAY_IDS[key];
+      if (disp) document.getElementById(disp[0]).textContent = disp[1](v);
+    });
+    updateStatus();
+  }
+
+  // Adaptive res regardless of MIDI state — use a lower quality multiplier during MIDI bursts
+  const { fx, fy } = params;
+  const pf = lcm(fx, fy) / Math.min(fx, fy);
+  const minResAdaptive = Math.ceil(Math.max(fx, fy) * pf * (midiActive ? 36 : 80) * Math.min(modComplexity(), 10));
+  const res = Math.min(Math.max(params.resolution, minResAdaptive), 160000);
+
+  const phaseIsMidi = midiActive && midiTarget.phase !== undefined;
+  let phase;
+  if (phaseIsMidi) {
+    phase = params.phase;
+  } else if (animating) {
+    animPhase = (animPhase + 0.004 * animSpeed) % 2;
+    phase = animPhase;
+  } else {
+    phase = params.phase;
+  }
+
+  const logSize = canvas.width / (window.devicePixelRatio || 1);
+
+  // Apply smoothed (interpolated) MIDI-CC mappings to base params first, so LFOs
+  // modulate on top of the freshly-set base values.
+  tickMappings(lfodt);
+
+  advanceLFOs(lfodt);
+  applyLFOs();
+
+  // While LFO-modulated values are live in params, rebuild audio + sync sliders.
+  pwTick(now);
+  tickLFOSliders(now);
+
+  if (constructionView) {
+    if (animating) animPhase = (animPhase + 0.004 * animSpeed) % 2;
+    drawMode4(ctx, logSize, logSize, animating ? animPhase : params.phase);
+  } else {
+    drawLissajous(ctx, logSize, logSize, phase, res, Math.max(0.6, recZoom));
+  }
+
+  if (recording) captureRecFrame(phase);
+
+  restoreLFOs();
+}
+
+// Controls wiring
+function bindSlider(id, key, display, fmt) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    params[key] = parseFloat(el.value);
+    document.getElementById(display).textContent = fmt(params[key]);
+    updateStatus();
+  });
+}
+
+bindSlider('ax', 'ax', 'ax-val', v => v.toFixed(2));
+bindSlider('ay', 'ay', 'ay-val', v => v.toFixed(2));
+bindSlider('fx', 'fx', 'fx-val', v => Number.isInteger(v) ? v : v.toFixed(1));
+bindSlider('fy', 'fy', 'fy-val', v => Number.isInteger(v) ? v : v.toFixed(1));
+bindSlider('phase', 'phase', 'phase-val', v => v.toFixed(2) + 'π');
+
+document.getElementById('stroke-color').addEventListener('input', e => { params.strokeColor = e.target.value; });
+
+// Background colour drives the whole page background (header, canvas area, bottom
+// bar) as well as the figure fill. The sidebar keeps its own fixed panel colour so
+// the controls stay readable regardless of the chosen background.
+function applyPageBg() {
+  document.body.style.background = params.bgColor;
+}
+document.getElementById('bg-color').addEventListener('input', e => { params.bgColor = e.target.value; applyPageBg(); });
+document.getElementById('line-width').addEventListener('input', e => {
+  params.lineWidth = parseFloat(e.target.value);
+  document.getElementById('line-width-val').textContent = params.lineWidth.toFixed(1);
+});
+document.getElementById('resolution').addEventListener('input', e => { params.resolution = parseInt(e.target.value); });
+
+document.getElementById('animate').addEventListener('change', e => {
+  animating = e.target.checked;
+  document.getElementById('anim-speed-row').style.opacity = animating ? '1' : '0.4';
+});
+
+document.getElementById('anim-speed').addEventListener('input', e => {
+  animSpeed = parseFloat(e.target.value);
+  document.getElementById('speed-val').textContent = animSpeed.toFixed(1) + '×';
+});
+
+const WAVES = ['sine', 'triangle', 'sawtooth', 'square'];
+
+// Set a base waveform for an axis and reflect it in the toggle buttons + audio.
+function setBaseWave(axis, type) {
+  if (!WAVES.includes(type)) return;
+  if (axis === 'x') waveTypeX = type; else waveTypeY = type;
+  document.querySelectorAll(`.wave-btn[data-axis="${axis}"]`).forEach(b => {
+    b.classList.toggle('active', b.dataset.bwave === type);
+  });
+  drawWavePreview();
+  syncAudioParams();
+  schedulePeriodicWaveUpdate();
+}
+
+// Base wave selectors — independent per axis (X / Y)
+document.querySelectorAll('.wave-btn[data-bwave]').forEach(btn => {
+  btn.addEventListener('click', () => setBaseWave(btn.dataset.axis, btn.dataset.bwave));
+});
+
+// Modulator (FM / AM) waveform selectors
+function setModWave(mod, type) {
+  if (!WAVES.includes(type)) return;
+  if (mod === 'fm') params.fmWave = type; else if (mod === 'am') params.amWave = type; else return;
+  document.querySelectorAll(`.mod-wave-btn[data-mod="${mod}"]`).forEach(b => {
+    b.classList.toggle('active', b.dataset.mwave === type);
+  });
+  drawWavePreview();
+  schedulePeriodicWaveUpdate();
+}
+document.querySelectorAll('.mod-wave-btn').forEach(btn => {
+  btn.addEventListener('click', () => setModWave(btn.dataset.mod, btn.dataset.mwave));
+});
+
+function updateStatus() {
+  const fx = params.fx, fy = params.fy, ph = animating ? animPhase : params.phase;
+  document.getElementById('status-fx').textContent = Number.isInteger(fx) ? fx : fx.toFixed(1);
+  document.getElementById('status-fy').textContent = Number.isInteger(fy) ? fy : fy.toFixed(1);
+  document.getElementById('status-phase').textContent = ph.toFixed(2) + 'π';
+}
+
+// SVG export
+document.getElementById('btn-export').addEventListener('click', () => {
+  const w = canvas.width, h = canvas.height;
+  const { ax, fx, ay, fy, strokeColor, bgColor, lineWidth, resolution } = params;
+  const phase = animating ? animPhase : params.phase;
+  const cx = w / 2, cy = h / 2;
+  const rx = (w / 2 - 24) * ax;
+  const ry = (h / 2 - 24) * ay;
+
+  let points = [];
+  const steps = resolution * 2;
+  const T = Math.PI * 2 * lcm(fx, fy) / Math.min(fx, fy);
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * T;
+    const sx = processWave(fx * t + phase * Math.PI, fx * t, waveTypeX, 'x');
+    const sy = processWave(fy * t, fy * t, waveTypeY, 'y');
+    const x = cx + rx * (visualSwap ? sy : sx);
+    const y = cy + ry * (visualSwap ? sx : sy);
+    points.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(3)},${y.toFixed(3)}`);
+  }
+
+  const pathD = points.join(' ');
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <title>Lissajous fx=${fx} fy=${fy} waveX=${waveTypeX} waveY=${waveTypeY}</title>
+  <rect width="${w}" height="${h}" fill="${bgColor}"/>
+  <path d="${pathD}" fill="none" stroke="${strokeColor}" stroke-width="${lineWidth}" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>`;
+
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `lissajous_${fx}x${fy}_${waveTypeX}-${waveTypeY}.svg`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// Reset every synthesis / figure / render parameter to its starting value.
+function resetAll() {
+  Object.keys(PARAM_DEFAULTS).forEach(k => { params[k] = PARAM_DEFAULTS[k]; });
+  waveTypeX = 'sine';
+  waveTypeY = 'sine';
+  visualSwap = false;
+  syncHard = true;
+  syncSingle = false;
+  pwInvert = false;
+  warpHInvert = false;
+  warpVInvert = false;
+  filterType = 'lowpass';
+  phaseModulators = false;
+  animPhase = params.phase;
+  strokeHSL = hexToHsl(params.strokeColor);
+  refreshAllControls();
+  updateSwapBtn();
+}
+document.getElementById('btn-reset').addEventListener('click', resetAll);
+
+// Resize canvas to fit container
+function resize() {
+  const area = document.querySelector('.canvas-area');
+  const size = Math.min(area.clientWidth - 48, area.clientHeight - 48, 700);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  ctx.scale(dpr, dpr);
+  ctx.imageSmoothingEnabled = true;
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+drawWavePreview();
+
+// ── Frequency ratio presets ────────────────────────────────────────────────
+const PRESETS = [
+  { fx:1,  fy:1,  label:'1:1'   },
+  { fx:2,  fy:1,  label:'2:1'   },
+  { fx:3,  fy:2,  label:'3:2'   },
+  { fx:4,  fy:3,  label:'4:3'   },
+  { fx:5,  fy:4,  label:'5:4'   },
+  { fx:6,  fy:5,  label:'6:5'   },
+  { fx:7,  fy:6,  label:'7:6'   },
+  { fx:9,  fy:8,  label:'9:8'   },
+  { fx:10, fy:9,  label:'10:9'  },
+  { fx:11, fy:10, label:'11:10' },
+  { fx:12, fy:11, label:'12:11' },
+  { fx:13, fy:12, label:'13:12' },
+  { fx:14, fy:13, label:'14:13' },
+  { fx:15, fy:14, label:'15:14' },
+  { fx:16, fy:15, label:'16:15' },
+];
+
+function buildPresetGrid() {
+  const grid = document.getElementById('preset-grid');
+  PRESETS.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = p.label;
+    btn.dataset.fx = p.fx;
+    btn.dataset.fy = p.fy;
+    btn.addEventListener('click', () => {
+      applyPreset(p.fx, p.fy);
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function applyPreset(fx, fy) {
+  params.fx = fx;
+  params.fy = fy;
+  document.getElementById('fx').value = fx;
+  document.getElementById('fy').value = fy;
+  document.getElementById('fx-val').textContent = fx;
+  document.getElementById('fy-val').textContent = fy;
+  document.getElementById('status-fx').textContent = fx;
+  document.getElementById('status-fy').textContent = fy;
+  syncAudioParams();
+  highlightActivePreset();
+}
+
+function highlightActivePreset() {
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    const match = parseInt(btn.dataset.fx) === Math.round(params.fx * 2) / 2
+                && parseInt(btn.dataset.fy) === Math.round(params.fy * 2) / 2;
+    btn.classList.toggle('active', parseInt(btn.dataset.fx) === params.fx && parseInt(btn.dataset.fy) === params.fy);
+  });
+}
+
+// ── Note input mode ──────────────────────────────────────────────────────────
+// 'manual' = sliders only  |  'dual' (shown as MIDI) = X + Y notes drive the ratio
+let noteInputMode = 'manual';
+let noteXNote = null;
+let noteYNote = 0;  // 0=C…11=B
+let noteXChannel = 1;
+let noteYChannel = 2;
+
+const SEMITONE_RATIOS = [
+  { fx:1,  fy:1,  name:'unison'      },
+  { fx:16, fy:15, name:'minor 2nd'   },
+  { fx:9,  fy:8,  name:'major 2nd'   },
+  { fx:6,  fy:5,  name:'minor 3rd'   },
+  { fx:5,  fy:4,  name:'major 3rd'   },
+  { fx:4,  fy:3,  name:'perfect 4th' },
+  { fx:7,  fy:5,  name:'tritone'     },
+  { fx:3,  fy:2,  name:'perfect 5th' },
+  { fx:8,  fy:5,  name:'minor 6th'   },
+  { fx:5,  fy:3,  name:'major 6th'   },
+  { fx:7,  fy:4,  name:'minor 7th'   },
+  { fx:15, fy:8,  name:'major 7th'   },
+];
+
+let octaveMode = 'none'; // 'none' | 'full' | 'unison'
+
+function setNoteInputMode(mode) {
+  noteInputMode = mode;
+  document.getElementById('input-manual-btn').classList.toggle('active', mode === 'manual');
+  document.getElementById('input-dual-btn').classList.toggle('active', mode === 'dual');
+  const isDual = mode === 'dual';  // MIDI mode (X + Y notes drive the ratio)
+  const xp = document.getElementById('x-note-panel');      if (xp) xp.style.display = isDual ? '' : 'none';
+  const yp = document.getElementById('y-note-panel');      if (yp) yp.style.display = isDual ? '' : 'none';
+  const op = document.getElementById('octave-mode-panel'); if (op) op.style.display = isDual ? '' : 'none';
+  const sp = document.getElementById('note-status-panel'); if (sp) sp.style.display = isDual ? '' : 'none';
+}
+
+document.getElementById('input-manual-btn').addEventListener('click', () => setNoteInputMode('manual'));
+document.getElementById('input-dual-btn').addEventListener('click',   () => setNoteInputMode('dual'));
+
+// Y note slider (MIDI mode: sets Y pitch class)
+document.getElementById('y-note-slider').addEventListener('input', e => {
+  noteYNote = parseInt(e.target.value);
+  document.getElementById('y-note-val').textContent = NOTE_NAMES[noteYNote];
+});
+
+// X note slider (overrides MIDI for X in NOTE mode)
+document.getElementById('x-note-slider').addEventListener('input', e => {
+  const n = parseInt(e.target.value);
+  document.getElementById('x-note-val').textContent = NOTE_NAMES[n];
+  noteXNote = n;
+  recomputeNoteRatio();
+});
+
+// Channel selectors
+document.getElementById('note-x-ch').addEventListener('change', e => { noteXChannel = parseInt(e.target.value); });
+document.getElementById('note-y-ch').addEventListener('change', e => { noteYChannel = parseInt(e.target.value); });
+
+// Octave mode buttons
+['none','full','unison'].forEach((mode, i) => {
+  const ids = ['oct-none-btn','oct-full-btn','oct-unison-btn'];
+  document.getElementById(ids[i]).addEventListener('click', () => {
+    octaveMode = mode;
+    ids.forEach((id, j) => document.getElementById(id).classList.toggle('active', j === i));
+    recomputeNoteRatio();
+  });
+});
+
+function closestJustRatio(targetRatio) {
+  let bestFx = 1, bestFy = 1, bestScore = Infinity;
+  for (let p = 1; p <= 16; p++) {
+    for (let q = 1; q <= 16; q++) {
+      const logErr = Math.abs(Math.log2(p / q) - Math.log2(Math.abs(targetRatio) || 1));
+      const score = logErr + (p + q) * 0.002;
+      if (score < bestScore) { bestScore = score; bestFx = p; bestFy = q; }
+    }
+  }
+  return { fx: bestFx, fy: bestFy };
+}
+
+function recomputeNoteRatio() {
+  if (noteXNote === null) return;
+  const yRef = noteYNote;
+  const raw = noteXNote - yRef;
+  const absSt = Math.abs(raw);
+  const modSt = ((raw % 12) + 12) % 12;
+  let r, intervalLabel;
+
+  if (octaveMode === 'full') {
+    r = closestJustRatio(Math.pow(2, raw / 12));
+    const oct = Math.floor(absSt / 12), st = absSt % 12;
+    intervalLabel = (raw < 0 ? '↓ ' : '') + (oct > 0 ? oct + ' oct + ' : '') + (SEMITONE_RATIOS[st]?.name ?? st + ' st');
+  } else if (octaveMode === 'unison' && raw % 12 === 0) {
+    r = closestJustRatio(Math.pow(2, raw / 12));
+    intervalLabel = (raw < 0 ? '↓ ' : '') + (absSt === 0 ? 'unison' : (absSt/12) + ' oct');
+  } else {
+    r = SEMITONE_RATIOS[modSt];
+    intervalLabel = r.name;
+  }
+
+  params.fx = r.fx;
+  params.fy = r.fy;
+  document.getElementById('x-note-val').textContent = noteToName(noteXNote);
+  document.getElementById('y-note-val').textContent = NOTE_NAMES[yRef];
+  document.getElementById('note-interval-display').textContent = intervalLabel;
+  document.getElementById('note-ratio-display').textContent   = r.fx + ':' + r.fy;
+  document.getElementById('fx-val').textContent = r.fx;
+  document.getElementById('fy-val').textContent = r.fy;
+  document.getElementById('fx').value = r.fx;
+  document.getElementById('fy').value = r.fy;
+  updateStatus();
+  updateIntervalLabel();
+}
+
+// ── Parameter ranges (shared by LFO engine and MIDI mapping) ─────────────────
+const VEL_RANGES = {
+  fmAmount:  [0, 8],
+  fmRatio:   [0.5, 8],
+  pwAmount:  [-1, 1],
+  shapeAmt:  [0, 1],
+  warpH:     [-0.5, 0.5],
+  warpV:     [-1, 1],
+  syncAmt:   [0.1, 2],
+  foldDrive: [1, 8],
+  amAmt:     [0, 1],
+  amRatio:   [0.5, 8],
+  noiseAmt:  [0, 0.1],
+  filterCutoff: [0, 1],
+  filterQ:   [0.1, 20],
+  ax:        [0.1, 1],
+  ay:        [0.1, 1],
+  phase:     [0, 2],
+  lineWidth: [0.5, 8],
+  dotsLine:  [0, 1],
+  traceSpeed:    [0, 5],
+  untracedAlpha: [0, 1],
+  hue:   [0, 360],
+  sat:   [0, 100],
+  light: [0, 100],
+};
+// LFO target keys that live on strokeHSL (not params) — handled specially in
+// applyLFOs/restoreLFOs so colour can be modulated like any other target.
+const HSL_LFO = { hue: 'h', sat: 's', light: 'l' };
+
+// Per-parameter sidebar slider bindings (so modulation/MIDI can reflect in UI).
+const PARAM_UI = {
+  fmAmount:  { slider: 'fm-amount',  disp: 'fm-amount-val',  fmt: v => v.toFixed(1) },
+  filterCutoff: { slider: 'filter-freq', disp: 'filter-freq-val', fmt: v => fmtCutoff(v) },
+  filterQ:   { slider: 'filter-res', disp: 'filter-res-val', fmt: v => v.toFixed(1) },
+  dotsLine:  { slider: 'dots-line',  disp: 'dots-line-val',  fmt: v => (v >= 0.999 ? 'line' : Math.round(v*100) + '%') },
+  traceSpeed:    { slider: 'trace-speed',    disp: 'trace-speed-val',    fmt: v => v.toFixed(1) + '×' },
+  untracedAlpha: { slider: 'untraced-alpha', disp: 'untraced-alpha-val', fmt: v => Math.round(v*100) + '%' },
+  pwAmount:  { slider: 'pw-amount',  disp: 'pw-amount-val',  fmt: v => v.toFixed(2) },
+  shapeAmt:  { slider: 'shape-amt',  disp: 'shape-amt-val',  fmt: v => v.toFixed(2) },
+  warpH:     { slider: 'warph-amt',  disp: 'warph-amt-val',  fmt: v => v.toFixed(2) },
+  warpV:     { slider: 'warpv-amt',  disp: 'warpv-amt-val',  fmt: v => v.toFixed(2) },
+  syncAmt:   { slider: 'sync-amt',   disp: 'sync-amt-val',   fmt: v => v.toFixed(2) },
+  foldDrive: { slider: 'fold-drive', disp: 'fold-drive-val', fmt: v => v.toFixed(1) },
+  amAmt:     { slider: 'am-amt',     disp: 'am-amt-val',     fmt: v => v.toFixed(2) },
+  noiseAmt:  { slider: 'noise-amt',  disp: 'noise-amt-val',  fmt: v => v.toFixed(3) },
+  ax:        { slider: 'ax',         disp: 'ax-val',         fmt: v => v.toFixed(2) },
+  ay:        { slider: 'ay',         disp: 'ay-val',         fmt: v => v.toFixed(2) },
+  phase:     { slider: 'phase',      disp: 'phase-val',      fmt: v => v.toFixed(2) + 'π' },
+  lineWidth: { slider: 'line-width', disp: 'line-width-val', fmt: v => v.toFixed(1) },
+};
+
+// ── LFO engine ───────────────────────────────────────────────────────────────
+const LFO_TARGET_OPTIONS = [
+  ['fmAmount','FM Amount'], ['fmRatio','FM Ratio'], ['shapeAmt','Waveshape'], ['pwAmount','PWM Width'],
+  ['amAmt','AM Depth'], ['amRatio','AM Ratio'], ['foldDrive','Wavefold Drive'], ['warpH','Warp H'], ['warpV','Warp V'],
+  ['syncAmt','Sync'], ['noiseAmt','Noise (wave)'], ['filterCutoff','Filter Cutoff'], ['filterQ','Filter Reso'],
+  ['ax','X Amplitude'], ['ay','Y Amplitude'], ['phase','Phase'], ['lineWidth','Line Width'], ['dotsLine','Dots ↔ Line'],
+  ['traceSpeed','Trace Tempo'], ['untracedAlpha','Untraced Opacity'],
+  ['hue','Colour Hue'], ['sat','Colour Sat'], ['light','Colour Luminosity'],
+];
+// Keys whose modulation requires rebuilding the periodic wavetable (noise is a
+// separate live audio source, so it's intentionally excluded here).
+const LFO_SYNTH_KEYS = ['fmAmount','fmRatio','pwAmount','shapeAmt','warpH','warpV','syncAmt','foldDrive','amAmt','amRatio','filterCutoff','filterQ'];
+
+function lfoWaveFn(phase, type) {
+  // phase in [0,1]
+  const t = phase * Math.PI * 2;
+  switch (type) {
+    case 'triangle': { const n = ((t/Math.PI % 2) + 2) % 2; return n < 1 ? 2*n-1 : 3-2*n; }
+    case 'sawtooth': return ((t/Math.PI % 2) + 2) % 2 - 1;
+    case 'square':   return Math.sign(Math.sin(t));
+    default:         return Math.sin(t);
+  }
+}
+
+const lfos = [0, 1].map(i => ({
+  i,
+  wave:      'sine',
+  freq:      i === 0 ? 0.5 : 1.0,
+  depth:     0.5,
+  retrigger: false,
+  phase:     0,
+  assignments: [],   // array of param keys this LFO modulates
+}));
+
+// LFO param save/restore (applied around each draw)
+const _lfoSaved = {};
+let _lfoSavedKeys = null;
+let _lfoSavedColor = null, _lfoColorActive = false;
+
+// Get/set a target value, transparently handling colour keys (strokeHSL) vs params.
+function _lfoGet(key) { return HSL_LFO[key] ? strokeHSL[HSL_LFO[key]] : params[key]; }
+function _lfoSet(key, val) { if (HSL_LFO[key]) strokeHSL[HSL_LFO[key]] = val; else params[key] = val; }
+
+function advanceLFOs(dtSec) {
+  if (!Number.isFinite(dtSec) || dtSec <= 0) return;
+  lfos.forEach(lfo => {
+    lfo.phase = (lfo.phase + lfo.freq * dtSec) % 1;
+  });
+}
+
+function lfoOutput(lfo) {
+  return lfoWaveFn(lfo.phase, lfo.wave) * lfo.depth;
+}
+
+function applyLFOs() {
+  const keys = new Set();
+  lfos.forEach(l => l.assignments.forEach(k => keys.add(k)));
+  _lfoSavedKeys = keys;
+  let colorTouched = false;
+  keys.forEach(k => { _lfoSaved[k] = _lfoGet(k); if (HSL_LFO[k]) colorTouched = true; });
+  if (colorTouched) _lfoSavedColor = params.strokeColor;
+  lfos.forEach(lfo => {
+    if (!lfo.assignments.length) return;
+    const v = lfoOutput(lfo);
+    lfo.assignments.forEach(key => {
+      const r = VEL_RANGES[key]; if (!r) return;
+      const [lo, hi] = r;
+      _lfoSet(key, Math.max(lo, Math.min(hi, _lfoGet(key) + v * (hi - lo) * 0.5)));
+    });
+  });
+  // Colour keys live on strokeHSL; fold the modulated HSL into the live stroke colour.
+  if (colorTouched) {
+    params.strokeColor = hslToHex(strokeHSL.h, strokeHSL.s, strokeHSL.l);
+    _lfoColorActive = true;
+  } else {
+    _lfoColorActive = false;
+  }
+}
+
+function restoreLFOs() {
+  if (_lfoSavedKeys) _lfoSavedKeys.forEach(k => _lfoSet(k, _lfoSaved[k]));
+  if (_lfoColorActive) { params.strokeColor = _lfoSavedColor; _lfoColorActive = false; }
+}
+
+function retriggerLFOs() {
+  lfos.forEach(lfo => { if (lfo.retrigger) lfo.phase = 0; });
+}
+
+// ── Dynamic LFO UI (built into #lfo-list) ────────────────────────────────────
+const WAVE_LABELS = { sine:'SIN', triangle:'TRI', sawtooth:'SAW', square:'SQR' };
+
+function buildLFOPanels() {
+  const list = document.getElementById('lfo-list');
+  list.innerHTML = '';
+  lfos.forEach(lfo => {
+    const i = lfo.i;
+    const panel = document.createElement('div');
+    panel.className = 'lfo-panel';
+    if (i > 0) panel.style.marginTop = '8px';
+    panel.innerHTML = `
+      <div class="lfo-header">
+        <span class="lfo-num">LFO ${i + 1}</span>
+        <div class="lfo-wave-toggle">
+          ${['sine','triangle','sawtooth','square'].map(w =>
+            `<button class="lfo-wave-btn${lfo.wave===w?' active':''}" data-lwave="${w}">${WAVE_LABELS[w]}</button>`).join('')}
+        </div>
+        <button class="retrig-btn${lfo.retrigger?' active':''}" data-role="retrig">retrig</button>
+      </div>
+      <div class="param-row">
+        <div class="param-header"><label>Rate</label><span class="val" id="lfo${i}-freq-val">${lfo.freq.toFixed(2)} Hz</span></div>
+        <input type="range" id="lfo${i}-freq" min="0.01" max="6" step="0.01" value="${lfo.freq}">
+      </div>
+      <div class="param-row">
+        <div class="param-header"><label>Depth</label><span class="val" id="lfo${i}-depth-val">${Math.round(lfo.depth*100)}%</span></div>
+        <input type="range" id="lfo${i}-depth" min="0" max="1" step="0.01" value="${lfo.depth}">
+      </div>
+      <div class="lfo-target-list"></div>
+      <button class="map-add-btn" data-role="add-target">+ add target</button>
+    `;
+    list.appendChild(panel);
+    lfo._panel = panel;
+
+    panel.querySelectorAll('.lfo-wave-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        panel.querySelectorAll('.lfo-wave-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        lfo.wave = btn.dataset.lwave;
+      });
+    });
+    panel.querySelector('[data-role=retrig]').addEventListener('click', e => {
+      lfo.retrigger = !lfo.retrigger;
+      e.currentTarget.classList.toggle('active', lfo.retrigger);
+    });
+    const freqEl = panel.querySelector(`#lfo${i}-freq`);
+    freqEl.addEventListener('input', () => {
+      lfo.freq = parseFloat(freqEl.value);
+      document.getElementById(`lfo${i}-freq-val`).textContent = lfo.freq.toFixed(2) + ' Hz';
+    });
+    const depthEl = panel.querySelector(`#lfo${i}-depth`);
+    depthEl.addEventListener('input', () => {
+      lfo.depth = parseFloat(depthEl.value);
+      document.getElementById(`lfo${i}-depth-val`).textContent = Math.round(lfo.depth * 100) + '%';
+    });
+    panel.querySelector('[data-role=add-target]').addEventListener('click', () => {
+      const opt = LFO_TARGET_OPTIONS.find(o => !lfo.assignments.includes(o[0])) || LFO_TARGET_OPTIONS[0];
+      lfo.assignments.push(opt[0]);
+      renderLFOTargets(lfo);
+    });
+    renderLFOTargets(lfo);
+  });
+}
+
+function renderLFOTargets(lfo) {
+  const cont = lfo._panel.querySelector('.lfo-target-list');
+  cont.innerHTML = '';
+  lfo.assignments.forEach((key, idx) => {
+    const row = document.createElement('div');
+    row.className = 'map-row';
+    row.style.cssText = 'padding:5px 6px;margin:5px 0 0';
+    const sel = document.createElement('select');
+    sel.className = 'map-target';
+    LFO_TARGET_OPTIONS.forEach(([k, label]) => {
+      const o = document.createElement('option');
+      o.value = k; o.textContent = label;
+      if (k === key) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', () => { lfo.assignments[idx] = sel.value; });
+    const rm = document.createElement('button');
+    rm.className = 'map-remove'; rm.textContent = '×';
+    rm.addEventListener('click', () => { lfo.assignments.splice(idx, 1); renderLFOTargets(lfo); });
+    row.appendChild(sel);
+    row.appendChild(rm);
+    cont.appendChild(row);
+  });
+}
+
+// ─── AUDIO ───────────────────────────────────────────────────────────────────
+
+let audioCtx = null;
+let oscX = null, oscY = null;
+let panX = null, panY = null;
+let masterGain = null;
+let noiseGain = null, noiseSrc = null;
+const NOISE_SCALE = 4;  // maps noiseAmt 0..0.1 to a sensible audio level (0..0.4)
+let audioEnabled = false;
+let audioStereo = true;  // true = X→L / Y→R, false = X+Y summed to mono
+
+// ── Internal / external input routing ────────────────────────────────────────
+// internalGain sums the synth (oscillators + noise); externalGain sums a captured
+// device. Both feed masterGain. Switching source crossfades between the two gains.
+// recDest is a MediaStreamDestination tapped off masterGain so the video recorder
+// can include whatever is currently playing (internal synth or external input).
+let internalGain = null, externalGain = null, recDest = null;
+let monitorGain = null;                // speaker path; muted when monitoring is off
+let externalStream = null, externalSource = null;
+let externalAnalyser = null;           // taps the external input for the level meter
+let externalLevel = 0;                 // smoothed 0..1 input level for the meter
+let externalSink = null;               // muted <audio> that keeps the input stream flowing (Chrome)
+let inputMode = 'internal';            // 'internal' | 'external'
+let audioInputDeviceId = '';           // selected input device
+let externalInputGainValue = 1;        // user-facing input gain
+let monitorEnabled = true;             // whether output is sent to the speakers
+
+// Apply the current channel mode to the live panners (and reflect on toggle).
+function applyAudioChannelMode() {
+  document.getElementById('audio-stereo-btn').classList.toggle('active', audioStereo);
+  document.getElementById('audio-mono-btn').classList.toggle('active', !audioStereo);
+  if (!audioCtx || !panX || !panY) return;
+  const t = audioCtx.currentTime;
+  // Mono: both oscillators centred so they sum equally into both channels.
+  panX.pan.setTargetAtTime(audioStereo ? -1 : 0, t, 0.02);
+  panY.pan.setTargetAtTime(audioStereo ?  1 : 0, t, 0.02);
+}
+
+// All four names map directly to native Web Audio oscillator types.
+function audioWaveTypeFor(axis) {
+  return axis === 'x' ? waveTypeX : waveTypeY;
+}
+
+function startAudio() {
+  if (audioCtx) audioCtx.close();
+  audioCtx = new AudioContext();
+
+  const vol = parseFloat(document.getElementById('audio-vol').value);
+  masterGain = audioCtx.createGain();
+  // Ramp the gain up from silence to avoid the on-click / pop.
+  masterGain.gain.value = 0;
+  masterGain.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.02);
+
+  // Monitor path: masterGain → monitorGain → speakers. The monitor toggle mutes the
+  // speakers without affecting what gets recorded. (The multimode filter is applied
+  // in the waveform/wavetable itself, not as an output node.)
+  monitorGain = audioCtx.createGain();
+  monitorGain.gain.value = monitorEnabled ? 1 : 0;
+  monitorGain.connect(audioCtx.destination);
+  masterGain.connect(monitorGain);
+
+  // Recording tap is taken BEFORE the monitor gain, so recordings always contain
+  // audio even when monitoring is muted.
+  recDest = audioCtx.createMediaStreamDestination();
+  masterGain.connect(recDest);
+
+  // Source buses. internalGain carries the synth; externalGain carries the device.
+  internalGain = audioCtx.createGain();
+  externalGain = audioCtx.createGain();
+  internalGain.connect(masterGain);
+  externalGain.connect(masterGain);
+  // Initial mix reflects the current source selection.
+  internalGain.gain.value = inputMode === 'external' ? 0 : 1;
+  externalGain.gain.value = inputMode === 'external' ? externalInputGainValue : 0;
+
+  // Analyser taps the external input for the level meter. It sits BEFORE the
+  // external gain so the meter shows the raw incoming signal regardless of monitor
+  // level / mute. externalSource (created on device connect) feeds into it.
+  externalAnalyser = audioCtx.createAnalyser();
+  externalAnalyser.fftSize = 1024;
+  externalAnalyser.smoothingTimeConstant = 0.3;
+  externalAnalyser.connect(externalGain);
+
+  // X → left (stereo) or centre (mono)
+  panX = audioCtx.createStereoPanner();
+  panX.pan.value = audioStereo ? -1 : 0;
+  panX.connect(internalGain);
+
+  oscX = audioCtx.createOscillator();
+  oscX.frequency.value = params.fx * baseFreq;
+  oscX.connect(panX);
+  oscX.start();
+
+  // Y → right (stereo) or centre (mono)
+  panY = audioCtx.createStereoPanner();
+  panY.pan.value = audioStereo ? 1 : 0;
+  panY.connect(internalGain);
+
+  oscY = audioCtx.createOscillator();
+  oscY.frequency.value = params.fy * baseFreq;
+  oscY.connect(panY);
+  oscY.start();
+
+  // White-noise source (level follows params.noiseAmt, updated each frame).
+  noiseGain = audioCtx.createGain();
+  noiseGain.gain.value = Math.max(0, params.noiseAmt) * NOISE_SCALE;
+  noiseGain.connect(internalGain);
+  const nbuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+  const nd = nbuf.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  noiseSrc = audioCtx.createBufferSource();
+  noiseSrc.buffer = nbuf; noiseSrc.loop = true;
+  noiseSrc.connect(noiseGain); noiseSrc.start();
+
+  // Always drive both oscillators with a computed PeriodicWave so there is never
+  // a hard switch between native and periodic waveforms (that switch caused the
+  // audible pop when crossing from no-modulation to any modulation).
+  applyPeriodicWave();
+
+  // A context created outside a user gesture can start suspended — resume it.
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  // Re-attach a previously selected external device to the fresh graph.
+  if (inputMode === 'external' && audioInputDeviceId) {
+    connectExternalInput(audioInputDeviceId);
+  }
+}
+
+function stopAudio() {
+  if (oscX) { try { oscX.stop(); } catch(e) {} oscX = null; }
+  if (oscY) { try { oscY.stop(); } catch(e) {} oscY = null; }
+  if (noiseSrc) { try { noiseSrc.stop(); } catch(e) {} noiseSrc = null; }
+  noiseGain = null;
+  // Release any captured external input device.
+  if (externalSource) { try { externalSource.disconnect(); } catch(e) {} externalSource = null; }
+  if (externalStream) { externalStream.getTracks().forEach(t => t.stop()); externalStream = null; }
+  if (externalSink) { try { externalSink.pause(); externalSink.srcObject = null; } catch(e) {} externalSink = null; }
+  externalAnalyser = null; externalLevel = 0;
+  internalGain = externalGain = recDest = monitorGain = null;
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+}
+
+function syncAudioParams() {
+  const fxHz = params.fx * baseFreq;
+  const fyHz = params.fy * baseFreq;
+  document.getElementById('audio-fx-hz').textContent = Math.round(fxHz) + ' Hz';
+  document.getElementById('audio-fy-hz').textContent = Math.round(fyHz) + ' Hz';
+  updateIntervalLabel();
+  if (!audioEnabled || !oscX) return;
+  const t = audioCtx.currentTime;
+  oscX.frequency.setTargetAtTime(fxHz, t, 0.02);
+  oscY.frequency.setTargetAtTime(fyHz, t, 0.02);
+  // Oscillators always carry a PeriodicWave (rebuilt via pwTick when dirty);
+  // frequency changes here don't require a wave rebuild.
+}
+
+document.getElementById('audio-enable').addEventListener('change', e => {
+  audioEnabled = e.target.checked;
+  if (audioEnabled) {
+    startAudio();
+    syncAudioParams();
+  } else {
+    stopAudio();
+  }
+});
+
+document.getElementById('audio-vol').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  document.getElementById('vol-val').textContent = Math.round(v * 100) + '%';
+  if (masterGain) masterGain.gain.setTargetAtTime(v, audioCtx.currentTime, 0.01);
+});
+
+document.getElementById('audio-stereo-btn').addEventListener('click', () => { audioStereo = true;  applyAudioChannelMode(); });
+document.getElementById('audio-mono-btn').addEventListener('click',   () => { audioStereo = false; applyAudioChannelMode(); });
+
+// ── External audio input ──────────────────────────────────────────────────────
+function ainStatus(text, state) {
+  const t = document.getElementById('ain-status');
+  const d = document.getElementById('ain-dot');
+  if (t) t.textContent = text;
+  if (d) d.className = 'midi-dot' + (state ? ' ' + state : '');
+}
+
+// Ensure the audio engine is running (so the graph + recording tap exist),
+// reflecting it on the Enable-output checkbox.
+function ensureAudioRunning() {
+  if (audioCtx && masterGain) return;
+  audioEnabled = true;
+  const cb = document.getElementById('audio-enable');
+  if (cb) cb.checked = true;
+  startAudio();
+  syncAudioParams();
+}
+
+// Full teardown + rebuild of the Web Audio graph. This is the reliable recovery
+// when the engine wedges after a macOS in/out device change (e.g. BlackHole was
+// removed as the system default): re-granting alone won't fix a dead AudioContext,
+// but a clean rebuild + recapture does. Safe to call from internal mode too.
+async function resetAudioEngine() {
+  const wasExternal = inputMode === 'external';
+  const sel = document.getElementById('audio-input-select');
+  const dev = (sel && sel.value) || audioInputDeviceId || '';
+  ainStatus('resetting audio engine…');
+  stopAudio();
+  audioEnabled = true;
+  const cb = document.getElementById('audio-enable');
+  if (cb) cb.checked = true;
+  startAudio();                 // fresh context bound to the CURRENT system devices
+  syncAudioParams();
+  if (wasExternal) {
+    inputMode = 'external';
+    await connectExternalInput(dev);   // recapture the chosen device on the new graph
+  } else {
+    applyInputMode();
+    ainStatus('audio engine reset');
+  }
+}
+
+// Show internal-only vs external-only controls for the chosen source.
+function updateAudioSourceUI() {
+  const intC = document.getElementById('ain-internal-controls');
+  const extC = document.getElementById('ain-external-controls');
+  if (intC) intC.style.display = inputMode === 'external' ? 'none' : '';
+  if (extC) extC.style.display = inputMode === 'external' ? '' : 'none';
+}
+
+// Switch source exclusively — either the internal generator OR the external input,
+// never both. The internal synth bus is fully muted in external mode and the
+// external media element is muted/stopped in internal mode (see applyMonitor).
+function applyInputMode() {
+  document.getElementById('ain-internal-btn').classList.toggle('active', inputMode === 'internal');
+  document.getElementById('ain-external-btn').classList.toggle('active', inputMode === 'external');
+  updateAudioSourceUI();
+  if (audioCtx) {
+    const t = audioCtx.currentTime;
+    // Exclusive: only one bus is live at a time.
+    if (internalGain) internalGain.gain.setTargetAtTime(inputMode === 'external' ? 0 : 1, t, 0.03);
+    if (externalGain) externalGain.gain.setTargetAtTime(inputMode === 'external' ? externalInputGainValue : 0, t, 0.03);
+  }
+  applyMonitor();
+}
+
+// Monitor toggle gates the speaker path for BOTH sources (recording taps before it,
+// so recordings keep audio even when monitoring is off).
+function applyMonitor() {
+  if (monitorGain && audioCtx) {
+    monitorGain.gain.setTargetAtTime(monitorEnabled ? 1 : 0, audioCtx.currentTime, 0.02);
+  }
+}
+
+// Populate the device dropdown. Chrome only reveals device labels (and stable
+// deviceIds) while a capture stream is live or after a persistent grant — so call
+// this from requestPermissionAndList(), which holds a stream open during enumerate.
+async function refreshAudioInputs() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+    ainStatus('not supported in this browser', 'error');
+    return;
+  }
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const sel = document.getElementById('audio-input-select');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— select device —</option>';
+    const ins = devices.filter(d => d.kind === 'audioinput');
+    let unlabelled = 0;
+    ins.forEach((d, i) => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `Input ${i + 1} (grant access for name)`;
+      if (!d.label) unlabelled++;
+      sel.appendChild(opt);
+    });
+    if (prev) sel.value = prev;
+    const diag = document.getElementById('ain-diag');
+    if (diag) diag.textContent = `${ins.length} input device(s)` + (unlabelled ? ` · ${unlabelled} unlabelled — click "grant access & list"` : '');
+  } catch (e) {
+    ainStatus('could not list devices: ' + (e.name || ''), 'error');
+  }
+}
+
+// Request mic permission and list devices WHILE the grant stream is still open, so
+// Chrome exposes real labels + deviceIds (the cause of the "Input 1" placeholder).
+async function requestPermissionAndList() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    ainStatus('getUserMedia needs https:// or localhost (not file://)', 'error');
+    return;
+  }
+  let tmp = null;
+  try {
+    tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
+    ainStatus('access granted — pick a device', 'connected');
+  } catch (e) {
+    ainStatus((e && e.name ? e.name : 'error') + (e && e.message ? ': ' + e.message.slice(0, 40) : ''), 'error');
+    return;
+  }
+  await refreshAudioInputs();              // enumerate while the stream is live
+  setTimeout(() => { try { tmp.getTracks().forEach(t => t.stop()); } catch (e) {} }, 300);
+}
+
+// Capture a device and route it into externalGain. Disables browser DSP so the
+// signal is passed through verbatim (important for recording an interface).
+let _externalConnecting = false;
+async function connectExternalInput(deviceId) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    ainStatus('not supported in this browser', 'error');
+    return;
+  }
+  if (_externalConnecting) return;   // guard against startAudio's re-attach tail re-entering
+  _externalConnecting = true;
+  try {
+  // A context can end up 'closed' (or wedged 'suspended') when the system in/out
+  // device changes underneath it — rebuild from scratch rather than reuse a dead one.
+  if (audioCtx && audioCtx.state === 'closed') { audioCtx = null; masterGain = null; }
+  ensureAudioRunning();
+  if (audioCtx && audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch(e) {} }
+  // Tear down any previous capture.
+  if (externalSource) { try { externalSource.disconnect(); } catch(e) {} externalSource = null; }
+  if (externalStream) { externalStream.getTracks().forEach(t => t.stop()); externalStream = null; }
+  try {
+    const baseAudio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: deviceId ? { ...baseAudio, deviceId: { exact: deviceId } } : baseAudio,
+      });
+    } catch (err) {
+      // Stale/blank deviceId (common in Chrome before a labelled grant) → retry on default.
+      if (err && (err.name === 'OverconstrainedError' || err.name === 'NotFoundError') && deviceId) {
+        ainStatus('device id stale — using default; click "grant access & list"', 'error');
+        stream = await navigator.mediaDevices.getUserMedia({ audio: baseAudio });
+      } else {
+        throw err;
+      }
+    }
+    externalStream = stream;
+    // A bare MediaStreamAudioSourceNode emits silence in Chrome unless the stream
+    // is ALSO consumed by a media element. We keep a muted <audio> element alive
+    // purely as that "pump"; all audible monitoring/metering happens in Web Audio.
+    if (!externalSink) externalSink = new Audio();
+    externalSink.muted = true;
+    externalSink.srcObject = stream;
+    externalSink.play().catch(() => {});
+    // Route the device through Web Audio: source → analyser(meter) → externalGain
+    // → masterGain → (monitorGain → speakers) and (recDest tap). One unified path,
+    // so if the meter moves, monitoring and recording are receiving signal too.
+    externalSource = audioCtx.createMediaStreamSource(stream);
+    if (externalAnalyser) externalSource.connect(externalAnalyser);
+    else externalSource.connect(externalGain);
+    audioInputDeviceId = deviceId;
+    inputMode = 'external';
+    applyInputMode();
+    if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
+    const tr = stream.getAudioTracks()[0];
+    const st = tr && tr.getSettings ? tr.getSettings() : {};
+    const label = (tr && tr.label) || 'external device';
+    ainStatus(label.slice(0, 26) + (st.sampleRate ? ` · ${st.sampleRate}Hz` : ''), 'connected');
+    // Labels become available after a grant — refresh so the dropdown fills in.
+    refreshAudioInputs();
+  } catch (e) {
+    ainStatus((e && e.name ? e.name : 'error') + (e && e.message ? ': ' + e.message.slice(0,40) : ''), 'error');
+    inputMode = 'internal';
+    applyInputMode();
+  }
+  } finally {
+    _externalConnecting = false;
+  }
+}
+
+document.getElementById('ain-internal-btn').addEventListener('click', () => {
+  inputMode = 'internal';
+  applyInputMode();
+  ainStatus(audioEnabled ? 'internal synth' : 'internal synth (output off)');
+});
+
+document.getElementById('ain-external-btn').addEventListener('click', () => {
+  inputMode = 'external';
+  applyInputMode();
+  const sel = document.getElementById('audio-input-select');
+  // Capture immediately (selected device, or the system default if none chosen) so
+  // the meter goes live right away — even on browsers/origins that won't reveal
+  // device names. connectExternalInput re-lists devices while the stream is live.
+  connectExternalInput(sel.value || '');
+});
+
+document.getElementById('audio-input-select').addEventListener('change', e => {
+  if (e.target.value) connectExternalInput(e.target.value);
+});
+
+document.getElementById('ain-refresh').addEventListener('click', async () => {
+  await requestPermissionAndList();
+  // If we're already in external mode, re-establish capture on the freshly granted
+  // permission so "grant access" actually recovers a stalled input (not just lists).
+  if (inputMode === 'external') {
+    const sel = document.getElementById('audio-input-select');
+    await connectExternalInput(sel.value || '');
+  }
+});
+
+document.getElementById('ain-reset').addEventListener('click', resetAudioEngine);
+
+document.getElementById('ain-gain').addEventListener('input', e => {
+  externalInputGainValue = parseFloat(e.target.value);
+  document.getElementById('ain-gain-val').textContent = Math.round(externalInputGainValue * 100) + '%';
+  // Monitor level for the external input (recording uses the raw device track).
+  if (externalGain && audioCtx && inputMode === 'external') {
+    externalGain.gain.setTargetAtTime(externalInputGainValue, audioCtx.currentTime, 0.02);
+  }
+});
+
+document.getElementById('ain-monitor').addEventListener('change', e => {
+  monitorEnabled = e.target.checked;
+  applyMonitor();
+});
+
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', refreshAudioInputs);
+}
+
+// ── Multimode waveform filter (LP / HP / BP / Notch) — final synthesis stage ──
+function fmtCutoff(v) { return v >= 0.999 ? 'open' : Math.round(Math.pow(FILTER_MAX_HARMONICS, v)) + 'h'; }
+function setFilterType(t) {
+  filterType = t;
+  document.querySelectorAll('.wave-btn[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter === t));
+  drawWavePreview();
+  schedulePeriodicWaveUpdate();
+}
+document.querySelectorAll('.wave-btn[data-filter]').forEach(btn => {
+  btn.addEventListener('click', () => setFilterType(btn.dataset.filter));
+});
+document.getElementById('filter-freq').addEventListener('input', e => {
+  params.filterCutoff = parseFloat(e.target.value);
+  document.getElementById('filter-freq-val').textContent = fmtCutoff(params.filterCutoff);
+  drawWavePreview();
+  schedulePeriodicWaveUpdate();
+});
+document.getElementById('filter-res').addEventListener('input', e => {
+  params.filterQ = parseFloat(e.target.value);
+  document.getElementById('filter-res-val').textContent = params.filterQ.toFixed(1);
+  drawWavePreview();
+  schedulePeriodicWaveUpdate();
+});
+
+// Dots ↔ Line (figure-only) and Phase-rotates-modulators toggle.
+document.getElementById('dots-line').addEventListener('input', e => {
+  params.dotsLine = parseFloat(e.target.value);
+  document.getElementById('dots-line-val').textContent = params.dotsLine >= 0.999 ? 'line' : Math.round(params.dotsLine * 100) + '%';
+});
+document.getElementById('phase-modulators').addEventListener('change', e => {
+  phaseModulators = e.target.checked;
+  drawWavePreview();
+  schedulePeriodicWaveUpdate();
+});
+
+// X/Y swap button (mirrors the MIDI-mappable Visual X/Y Swap)
+function updateSwapBtn() {
+  const b = document.getElementById('xy-swap-btn');
+  if (b) b.classList.toggle('active', visualSwap);
+}
+document.getElementById('xy-swap-btn').addEventListener('click', () => { visualSwap = !visualSwap; updateSwapBtn(); });
+
+// Patch bindSlider to also sync audio after param update
+const _origBindSlider = bindSlider;
+
+// Hook freq sliders to sync audio — done after bindSlider wiring via direct listeners
+['fx', 'fy'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => { syncAudioParams(); highlightActivePreset(); });
+});
+
+// FM / AM modulator ratios — discrete simple fractions (denominators 1,2,3) the
+// slider snaps between. The slider value is an INDEX into these tables.
+const RATIO_LABELS = ['1/2','2/3','1/1','4/3','3/2','5/3','2/1','7/3','5/2','8/3','3/1','10/3','7/2','11/3','4/1','13/3','9/2','14/3','5/1','16/3','11/2','17/3','6/1','19/3','13/2','20/3','7/1','22/3','15/2','23/3','8/1'];
+const RATIO_STEPS  = [1/2,2/3,1/1,4/3,3/2,5/3,2/1,7/3,5/2,8/3,3/1,10/3,7/2,11/3,4/1,13/3,9/2,14/3,5/1,16/3,11/2,17/3,6/1,19/3,13/2,20/3,7/1,22/3,15/2,23/3,8/1];
+function ratioNearestIndex(v) {
+  let bi = 0, bd = Infinity;
+  for (let i = 0; i < RATIO_STEPS.length; i++) { const d = Math.abs(RATIO_STEPS[i] - v); if (d < bd) { bd = d; bi = i; } }
+  return bi;
+}
+// Snap a ratio value to the nearest fraction and reflect it on the index slider.
+// Used by MIDI CC mapping and control-refresh.
+function setRatioParam(key, sliderId, dispId, v) {
+  const idx = ratioNearestIndex(v);
+  params[key] = RATIO_STEPS[idx];
+  const e = document.getElementById(sliderId); if (e) e.value = idx;
+  const d = document.getElementById(dispId);   if (d) d.textContent = RATIO_LABELS[idx];
+  drawWavePreview();
+  schedulePeriodicWaveUpdate();
+}
+// Wire a fraction-stepped ratio slider (FM or AM). The slider holds an index.
+function bindRatioSlider(sliderId, dispId, key) {
+  const el = document.getElementById(sliderId);
+  el.addEventListener('input', () => {
+    const idx = Math.max(0, Math.min(RATIO_STEPS.length - 1, Math.round(parseFloat(el.value))));
+    params[key] = RATIO_STEPS[idx];
+    document.getElementById(dispId).textContent = RATIO_LABELS[idx];
+    drawWavePreview();
+    schedulePeriodicWaveUpdate();
+  });
+}
+bindRatioSlider('fm-ratio', 'fm-ratio-val', 'fmRatio');
+bindRatioSlider('am-ratio', 'am-ratio-val', 'amRatio');
+
+const SYNTH_SLIDERS = [
+  ['fm-amount',   'fmAmount',  v => v.toFixed(1)],
+  ['pw-amount',   'pwAmount',  v => v.toFixed(2)],
+  ['shape-amt',   'shapeAmt',  v => v.toFixed(2)],
+  ['warph-amt',   'warpH',     v => v.toFixed(2)],
+  ['warpv-amt',   'warpV',     v => v.toFixed(2)],
+  ['sync-amt',    'syncAmt',   v => v.toFixed(2)],
+  ['fold-drive',  'foldDrive', v => v.toFixed(1)],
+  ['am-amt',      'amAmt',     v => v.toFixed(2)],
+  ['noise-amt',   'noiseAmt',  v => v.toFixed(3)],
+];
+SYNTH_SLIDERS.forEach(([id, key, fmt]) => {
+  document.getElementById(id).addEventListener('input', e => {
+    params[key] = parseFloat(e.target.value);
+    document.getElementById(id + '-val').textContent = fmt(params[key]);
+    drawWavePreview();
+    schedulePeriodicWaveUpdate();
+  });
+});
+
+
+// ── X/Y invert-polarity checkboxes (PWM + both warps) ────────────────────────
+document.getElementById('pw-invert').addEventListener('change', e => { pwInvert = e.target.checked; });
+document.getElementById('warph-invert').addEventListener('change', e => { warpHInvert = e.target.checked; });
+document.getElementById('warpv-invert').addEventListener('change', e => { warpVInvert = e.target.checked; });
+
+// ── Sync mode checkboxes (hard/soft + single axis) ───────────────────────────
+document.getElementById('sync-hard').addEventListener('change', e => {
+  syncHard = e.target.checked;
+  drawWavePreview();
+  schedulePeriodicWaveUpdate();
+});
+document.getElementById('sync-single').addEventListener('change', e => {
+  syncSingle = e.target.checked;
+  drawWavePreview();
+  schedulePeriodicWaveUpdate();
+});
+
+// ── Construction view ────────────────────────────────────────────────────────
+let constructionView = true;
+function updateConstructionControls() {
+  const p = document.getElementById('construction-controls');
+  if (p) p.style.display = constructionView ? '' : 'none';
+}
+document.getElementById('construction-view').addEventListener('change', e => {
+  constructionView = e.target.checked;
+  mode4T = 0;
+  updateConstructionControls();
+});
+
+document.getElementById('trace-speed').addEventListener('input', e => {
+  params.traceSpeed = parseFloat(e.target.value);
+  document.getElementById('trace-speed-val').textContent = params.traceSpeed.toFixed(1) + '×';
+});
+document.getElementById('untraced-alpha').addEventListener('input', e => {
+  params.untracedAlpha = parseFloat(e.target.value);
+  document.getElementById('untraced-alpha-val').textContent = Math.round(params.untracedAlpha * 100) + '%';
+});
+
+// ─── MIDI ────────────────────────────────────────────────────────────────────
+
+// slider element ids matching param keys
+const SLIDER_IDS = { ax:'ax', fx:'fx', ay:'ay', fy:'fy', phase:'phase' };
+const DISPLAY_IDS = {
+  ax: ['ax-val', v => v.toFixed(2)],
+  fx: ['fx-val', v => Number.isInteger(v) ? v : v.toFixed(1)],
+  ay: ['ay-val', v => v.toFixed(2)],
+  fy: ['fy-val', v => Number.isInteger(v) ? v : v.toFixed(1)],
+  phase: ['phase-val', v => v.toFixed(2) + 'π'],
+};
+
+// Base frequency set by MIDI note or slider (default = 100 Hz)
+let baseFreq = 100;
+let baseFreqMode = 'midi'; // 'midi' | 'slider'
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function noteToName(n) { return NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1); }
+function noteToHz(n)   { return 440 * Math.pow(2, (n - 69) / 12); }
+
+function setBaseFreq(hz) {
+  baseFreq = hz;
+  document.getElementById('midi-note-display').textContent = Math.round(hz) + ' Hz';
+  syncAudioParams();
+  updateIntervalLabel();
+}
+
+function applyNoteOn(note) {
+  setBaseFreq(noteToHz(note));
+  document.getElementById('midi-note-name').textContent = noteToName(note);
+}
+
+// ── Base freq mode toggle ─────────────────────────────────────────────────────
+document.getElementById('basefreq-midi-btn').addEventListener('click', () => {
+  baseFreqMode = 'midi';
+  document.getElementById('basefreq-midi-btn').classList.add('active');
+  document.getElementById('basefreq-slider-btn').classList.remove('active');
+  document.getElementById('basefreq-midi-panel').style.display = '';
+  document.getElementById('basefreq-slider-panel').style.display = 'none';
+});
+
+document.getElementById('basefreq-slider-btn').addEventListener('click', () => {
+  baseFreqMode = 'slider';
+  document.getElementById('basefreq-slider-btn').classList.add('active');
+  document.getElementById('basefreq-midi-btn').classList.remove('active');
+  document.getElementById('basefreq-midi-panel').style.display = 'none';
+  document.getElementById('basefreq-slider-panel').style.display = '';
+});
+
+document.getElementById('basefreq-slider').addEventListener('input', e => {
+  const hz = parseFloat(e.target.value);
+  document.getElementById('basefreq-val').textContent = hz + ' Hz';
+  setBaseFreq(hz);
+});
+
+// ── Interval label ────────────────────────────────────────────────────────────
+// 12-TET interval names: semitone count → name + short symbol
+const INTERVAL_NAMES = [
+  'unison',       // 0
+  'minor 2nd',    // 1
+  'major 2nd',    // 2
+  'minor 3rd',    // 3
+  'major 3rd',    // 4
+  'perfect 4th',  // 5
+  'tritone',      // 6
+  'perfect 5th',  // 7
+  'minor 6th',    // 8
+  'major 6th',    // 9
+  'minor 7th',    // 10
+  'major 7th',    // 11
+  'octave',       // 12
+];
+
+let showInterval = true;
+
+document.getElementById('show-interval').addEventListener('change', e => {
+  showInterval = e.target.checked;
+  updateIntervalLabel();
+});
+
+// ── Active-parameter readout + label text size ───────────────────────────────
+let showActiveParam = false;
+let activeParamText = '';
+let labelSize = 11;
+
+function filterAbbrev() { return ({ lowpass:'LP', highpass:'HP', bandpass:'BP', notch:'Notch' })[filterType] || 'Filter'; }
+function activeLabelForKey(key) {
+  if (key === 'filterCutoff') return filterAbbrev() + ' Cutoff';
+  if (key === 'filterQ')      return filterAbbrev() + ' Reso';
+  const t = MAP_TARGETS[key];
+  if (t) return t.label;
+  return ({ traceSpeed:'Trace Tempo', untracedAlpha:'Untraced Opacity', resolution:'Resolution' })[key] || key;
+}
+// Slider DOM id → target key (for the manual-drag readout).
+const ALTER_SLIDER_KEY = {
+  'fm-amount':'fmAmount','fm-ratio':'fmRatio','am-amt':'amAmt','am-ratio':'amRatio',
+  'shape-amt':'shapeAmt','pw-amount':'pwAmount','fold-drive':'foldDrive',
+  'warph-amt':'warpH','warpv-amt':'warpV','sync-amt':'syncAmt','noise-amt':'noiseAmt',
+  'filter-freq':'filterCutoff','filter-res':'filterQ','ax':'ax','ay':'ay','fx':'fx','fy':'fy',
+  'phase':'phase','line-width':'lineWidth','dots-line':'dotsLine',
+  'hsl-h':'hue','hsl-s':'sat','hsl-l':'light','anim-speed':'animSpeed','audio-vol':'volume',
+  'trace-speed':'traceSpeed','untraced-alpha':'untracedAlpha','resolution':'resolution',
+};
+function setActiveParam(label) { activeParamText = label; renderActiveParam(); }
+function renderActiveParam() {
+  const el = document.getElementById('active-param-label');
+  if (!el) return;
+  el.textContent = activeParamText;
+  el.style.display = (showActiveParam && activeParamText) ? '' : 'none';
+}
+function applyLabelSize() {
+  const a = document.getElementById('interval-label');
+  const b = document.getElementById('active-param-label');
+  if (a) a.style.fontSize = labelSize + 'px';
+  if (b) b.style.fontSize = labelSize + 'px';
+}
+document.getElementById('show-active-param').addEventListener('change', e => {
+  showActiveParam = e.target.checked;
+  renderActiveParam();
+});
+document.getElementById('label-size').addEventListener('input', e => {
+  labelSize = parseInt(e.target.value);
+  document.getElementById('label-size-val').textContent = labelSize + ' px';
+  applyLabelSize();
+});
+// Manual slider drags → readout (CC/Evolve go through setTargetValue, see below).
+document.querySelector('.sidebar').addEventListener('input', e => {
+  const id = e.target && e.target.id;
+  const key = id && ALTER_SLIDER_KEY[id];
+  if (key) setActiveParam(activeLabelForKey(key));
+});
+
+function freqRatioToCents(f1, f2) {
+  // Returns cents difference: how far is f2/f1 from the nearest 12-TET interval
+  if (f1 <= 0 || f2 <= 0) return null;
+  // Express ratio as semitones (may be fractional)
+  const ratio = f2 / f1;
+  const semitones = 12 * Math.log2(ratio);
+  // Find nearest integer semitone, fold into one octave
+  const nearest = Math.round(semitones);
+  const cents = Math.round((semitones - nearest) * 100);
+  // Fold nearest into 0–12 for name lookup
+  const idx = ((nearest % 12) + 12) % 12;
+  // How many octaves up/down beyond the base interval
+  const octaves = Math.floor(nearest / 12);
+  return { idx, cents, octaves, semitones };
+}
+
+function updateIntervalLabel() {
+  const el = document.getElementById('interval-label');
+  if (!el) return;
+  if (!showInterval) { el.textContent = ''; return; }
+
+  const fxHz = params.fx * baseFreq;
+  const fyHz = params.fy * baseFreq;
+  const result = freqRatioToCents(fyHz, fxHz);
+  if (!result) { el.textContent = ''; return; }
+
+  const name = INTERVAL_NAMES[result.idx] || result.idx + ' st';
+  let label = name;
+  if (result.octaves > 0) label += ' +' + result.octaves + ' oct';
+  if (result.octaves < 0) label += ' ' + result.octaves + ' oct';
+  if (result.cents !== 0) {
+    label += '  ' + (result.cents > 0 ? '+' : '') + result.cents + ' ¢';
+  }
+  el.textContent = label;
+}
+
+let midiAccess = null;
+let activeInput = null;
+let midiChannel = 0;   // 0 = all
+
+const dot = document.getElementById('midi-dot');
+const statusText = document.getElementById('midi-status-text');
+
+function setMidiStatus(state, text) {
+  dot.className = 'midi-dot' + (state ? ' ' + state : '');
+  statusText.textContent = text;
+}
+
+// Dot state polled from render — no timers in the hot path
+let dotState = '';
+function updateDot(now) {
+  const want = (now - midiLastAt) < 120 ? 'active' : (activeInput ? 'connected' : '');
+  if (want !== dotState) { dotState = want; dot.className = 'midi-dot' + (want ? ' ' + want : ''); }
+}
+
+// External-input level meter — polled from the render loop. Reads the analyser RMS
+// and drives the bar. A moving bar proves signal is reaching Web Audio (so monitor
+// + record will too); a flat bar with a connected device points at the OS/device.
+const _meterBuf = new Uint8Array(1024);
+let _lastMeterPaint = 0;
+function updateInputMeter(now) {
+  if (inputMode !== 'external' || !externalAnalyser) { externalLevel *= 0.8; }
+  else {
+    externalAnalyser.getByteTimeDomainData(_meterBuf);
+    let sum = 0;
+    for (let i = 0; i < _meterBuf.length; i++) { const v = (_meterBuf[i] - 128) / 128; sum += v * v; }
+    const rms = Math.sqrt(sum / _meterBuf.length);          // 0..~1
+    const lvl = Math.min(1, rms * 3.2);                      // scale for visibility
+    externalLevel = lvl > externalLevel ? lvl : externalLevel * 0.85 + lvl * 0.15;
+  }
+  if (now - _lastMeterPaint > 50) {
+    _lastMeterPaint = now;
+    const fill = document.getElementById('ain-meter-fill');
+    if (fill) fill.style.width = Math.round(externalLevel * 100) + '%';
+    const diag = document.getElementById('ain-diag');
+    if (diag && inputMode === 'external') {
+      const tr = externalStream && externalStream.getAudioTracks()[0];
+      if (tr) diag.textContent = `track: ${tr.readyState}${tr.muted ? ' (muted by OS)' : ''} · level ${(externalLevel*100|0)}%`;
+    }
+  }
+}
+
+// Two optional roles: a note/main device and a separate mapping device.
+let noteInputId = '';   // handles note input (ratios, base freq, LFO retrigger)
+let mapInputId  = '';   // optional; handles CC mappings. '' → use the note device
+function effMapId() { return mapInputId || noteInputId; }
+
+// Track connection state so that disconnecting the input restores mapped params.
+let _midiWasConnected = false;
+function midiMapConnected() {
+  const id = effMapId();
+  return !!(id && midiAccess && midiAccess.inputs.get(id));
+}
+function checkMidiConnection() {
+  const now = midiMapConnected();
+  if (_midiWasConnected && !now) resetMappedParams();
+  _midiWasConnected = now;
+}
+
+function onMidiMessage(e, srcId) {
+  const status = e.data[0], data1 = e.data[1], data2 = e.data[2];
+  const type = status & 0xf0;
+  const ch   = (status & 0x0f) + 1;
+
+  const isMap  = srcId === effMapId();
+  const isNote = srcId === noteInputId;
+
+  // Control Change → only from the mapping device
+  if (type === 0xb0) {
+    if (!isMap) return;
+    midiLastAt = performance.now();
+    if (mapLearnTarget !== null) { bindLearnedCC(data1); return; }
+    handleMappedCC(data1, data2);
+    return;
+  }
+
+  // Session-preset grid pads: note-ons on the grid's own MIDI channel, accepted
+  // from ANY connected input (independent of the note-device assignment). A filled
+  // pad loads its patch; empty pads fall through to normal note handling.
+  if (type === 0x90 && data2 > 0 && ch === gridChannel) {
+    const idx = data1 - GRID_BASE_NOTE;
+    if (idx >= 0 && idx < GRID_PADS && gridPresets[idx]) {
+      midiLastAt = performance.now();
+      loadGridPad(idx);
+      return;
+    }
+  }
+
+  // Note messages → only from the note device
+  if (!isNote) return;
+
+  if (type === 0x90 && data2 > 0) {
+    // Base frequency (MIDI mode) follows note-ons on the Note Input X-axis channel —
+    // no separate channel of its own.
+    if (baseFreqMode === 'midi' && ch === noteXChannel) {
+      midiLastAt = performance.now();
+      applyNoteOn(data1);
+      retriggerLFOs();
+    }
+    // Ratio from MIDI ("MIDI" note-input mode): X and Y on their own channels.
+    if (noteInputMode === 'dual') {
+      if (ch === noteXChannel) { midiLastAt = performance.now(); noteXNote = data1; recomputeNoteRatio(); retriggerLFOs(); }
+      if (ch === noteYChannel) { midiLastAt = performance.now(); noteYNote = data1 % 12; recomputeNoteRatio(); }
+    }
+    return;
+  }
+}
+
+// Attach a dispatching handler to every input; routing is decided per message.
+function attachAllInputs() {
+  if (!midiAccess) return;
+  midiAccess.inputs.forEach(inp => { inp.onmidimessage = (e) => onMidiMessage(e, inp.id); });
+}
+
+function updateMidiStatusText() {
+  if (!noteInputId) { activeInput = null; setMidiStatus('', 'select an input'); return; }
+  const inp = midiAccess && midiAccess.inputs.get(noteInputId);
+  activeInput = inp || null;
+  setMidiStatus(inp ? 'connected' : '', inp ? inp.name.slice(0, 28) : 'device disconnected');
+}
+
+function fillInputSelect(sel, firstLabel) {
+  const prev = sel.value;
+  sel.innerHTML = `<option value="">${firstLabel}</option>`;
+  if (midiAccess) midiAccess.inputs.forEach(input => {
+    const opt = document.createElement('option');
+    opt.value = input.id; opt.textContent = input.name;
+    sel.appendChild(opt);
+  });
+  if (prev) sel.value = prev;
+}
+
+function populateInputs() {
+  fillInputSelect(document.getElementById('midi-input-select'), '— no input —');
+  fillInputSelect(document.getElementById('midi-map-input-select'), '— same as main —');
+}
+
+document.getElementById('midi-input-select').addEventListener('change', e => {
+  noteInputId = e.target.value;
+  attachAllInputs();
+  updateMidiStatusText();
+  checkMidiConnection();
+});
+document.getElementById('midi-map-input-select').addEventListener('change', e => {
+  mapInputId = e.target.value;
+  attachAllInputs();
+  checkMidiConnection();
+});
+
+if (navigator.requestMIDIAccess) {
+  navigator.requestMIDIAccess({ sysex: false }).then(access => {
+    midiAccess = access;
+    populateInputs();
+    attachAllInputs();
+    setMidiStatus('', 'select an input');
+
+    access.onstatechange = () => {
+      populateInputs();
+      attachAllInputs();
+      updateMidiStatusText();
+      checkMidiConnection();
+    };
+  }).catch(() => {
+    setMidiStatus('error', 'access denied');
+  });
+} else {
+  setMidiStatus('error', 'not supported (use Chrome)');
+}
+
+// ── Collapsible sections ─────────────────────────────────────────────────────
+document.querySelectorAll('.section > .section-label').forEach(label => {
+  label.addEventListener('click', () => {
+    label.parentElement.classList.toggle('collapsed');
+  });
+});
+// Foldable subsections (e.g. Warp & Sync) — toggle their wrapping .subsection-fold.
+document.querySelectorAll('.subsection-label.foldable').forEach(label => {
+  label.addEventListener('click', () => {
+    const fold = label.closest('.subsection-fold');
+    if (fold) fold.classList.toggle('collapsed');
+  });
+});
+
+// ── Realtime LFO → audio and slider sync ─────────────────────────────────────
+let _lastLFOSliderTick = 0;
+
+function lfoHasSynthTargets() {
+  return lfos.some(lfo => lfo.assignments.some(k => LFO_SYNTH_KEYS.includes(k)));
+}
+
+function lfoHasAnyTarget() {
+  return lfos.some(lfo => lfo.assignments.length > 0);
+}
+
+// Called with LFO-modulated params live — updates DOM sliders so they track modulation.
+function tickLFOSliders(now) {
+  if (!lfoHasAnyTarget()) return;
+  if (now - _lastLFOSliderTick < 50) return;
+  _lastLFOSliderTick = now;
+  const keys = new Set();
+  lfos.forEach(lfo => lfo.assignments.forEach(k => keys.add(k)));
+  keys.forEach(key => {
+    const m = PARAM_UI[key];
+    if (!m) return;
+    const el = document.getElementById(m.slider);
+    const disp = document.getElementById(m.disp);
+    if (el) el.value = params[key];
+    if (disp) disp.textContent = m.fmt(params[key]);
+  });
+  updateStatus();
+}
+
+// ─── ASSIGNABLE MIDI MAPPING ──────────────────────────────────────────────────
+
+// Colour state (HSL) so individual H/S/L can be mapped independently.
+function hexToHsl(hex) {
+  const h = hex.replace('#','');
+  let r = parseInt(h.slice(0,2),16)/255, g = parseInt(h.slice(2,4),16)/255, b = parseInt(h.slice(4,6),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  let hue = 0, sat = 0, light = (max+min)/2;
+  if (max !== min) {
+    const d = max - min;
+    sat = light > 0.5 ? d/(2-max-min) : d/(max+min);
+    if (max === r) hue = (g-b)/d + (g<b ? 6 : 0);
+    else if (max === g) hue = (b-r)/d + 2;
+    else hue = (r-g)/d + 4;
+    hue *= 60;
+  }
+  return { h: hue, s: sat*100, l: light*100 };
+}
+function hslToHex(h, s, l) {
+  h = ((h % 360) + 360) % 360; s = Math.max(0,Math.min(100,s))/100; l = Math.max(0,Math.min(100,l))/100;
+  const c = (1 - Math.abs(2*l-1)) * s;
+  const x = c * (1 - Math.abs((h/60) % 2 - 1));
+  const m = l - c/2;
+  let r=0,g=0,b=0;
+  if (h<60){r=c;g=x;} else if (h<120){r=x;g=c;} else if (h<180){g=c;b=x;}
+  else if (h<240){g=x;b=c;} else if (h<300){r=x;b=c;} else {r=c;b=x;}
+  const to = v => Math.round((v+m)*255).toString(16).padStart(2,'0');
+  return '#' + to(r) + to(g) + to(b);
+}
+let strokeHSL = hexToHsl(params.strokeColor);
+
+function updateHSLSliders() {
+  const h = Math.round(strokeHSL.h), s = Math.round(strokeHSL.s), l = Math.round(strokeHSL.l);
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+  set('hsl-h', h); set('hsl-s', s); set('hsl-l', l);
+  const hv = document.getElementById('hsl-h-val'); if (hv) hv.textContent = h;
+  const sv = document.getElementById('hsl-s-val'); if (sv) sv.textContent = s;
+  const lv = document.getElementById('hsl-l-val'); if (lv) lv.textContent = l;
+}
+
+function applyStrokeHSL() {
+  const hex = hslToHex(strokeHSL.h, strokeHSL.s, strokeHSL.l);
+  params.strokeColor = hex;
+  document.getElementById('stroke-color').value = hex;
+  updateHSLSliders();
+}
+// Keep HSL state in sync when the colour picker is used manually.
+document.getElementById('stroke-color').addEventListener('input', e => { strokeHSL = hexToHsl(e.target.value); updateHSLSliders(); });
+
+// HSL sliders in the Render section
+['h','s','l'].forEach(comp => {
+  const el = document.getElementById('hsl-' + comp);
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    if (comp === 'h') strokeHSL.h = v; else if (comp === 's') strokeHSL.s = v; else strokeHSL.l = v;
+    applyStrokeHSL();
+  });
+});
+updateHSLSliders();
+
+// Helper setters that update params/state + DOM + audio.
+function setSliderParam(key, slider, disp, fmt, value) {
+  params[key] = value;
+  const el = document.getElementById(slider); if (el) el.value = value;
+  const d = document.getElementById(disp); if (d) d.textContent = fmt(value);
+}
+function setFreq(key, value) {
+  params[key] = value;
+  const el = document.getElementById(key); if (el) el.value = value;
+  document.getElementById(key + '-val').textContent = Number.isInteger(value) ? value : value.toFixed(1);
+  document.getElementById('status-' + key).textContent = Number.isInteger(value) ? value : value.toFixed(1);
+  syncAudioParams();
+  highlightActivePreset();
+}
+
+// Registry of everything that can be MIDI-mapped.
+// Each: { label, min, max, step (optional snap), apply(value) }
+const _synthApply = (key, slider, disp, fmt) => v => { setSliderParam(key, slider, disp, fmt, v); drawWavePreview(); schedulePeriodicWaveUpdate(); };
+const MAP_TARGETS = {
+  fx:        { label:'X Frequency',   min:1,    max:16,  step:0.5,  apply:v => setFreq('fx', v) },
+  fy:        { label:'Y Frequency',   min:1,    max:16,  step:0.5,  apply:v => setFreq('fy', v) },
+  ax:        { label:'X Amplitude',   min:0.1,  max:1,              apply:v => { params.ax = v; const e=document.getElementById('ax'); if(e)e.value=v; const d=document.getElementById('ax-val'); if(d)d.textContent=v.toFixed(2); } },
+  ay:        { label:'Y Amplitude',   min:0.1,  max:1,              apply:v => { params.ay = v; const e=document.getElementById('ay'); if(e)e.value=v; const d=document.getElementById('ay-val'); if(d)d.textContent=v.toFixed(2); } },
+  fmAmount:  { label:'FM Amount',     min:0,    max:8,              apply:_synthApply('fmAmount','fm-amount','fm-amount-val',x=>x.toFixed(1)) },
+  fmRatio:   { label:'FM Ratio',      min:0.5,  max:8,              apply:v => setRatioParam('fmRatio','fm-ratio','fm-ratio-val',v) },
+  pwAmount:  { label:'PWM Width',     min:-1,   max:1,              apply:_synthApply('pwAmount','pw-amount','pw-amount-val',x=>x.toFixed(2)) },
+  shapeAmt:  { label:'Waveshape',     min:0,    max:1,              apply:_synthApply('shapeAmt','shape-amt','shape-amt-val',x=>x.toFixed(2)) },
+  warpH:     { label:'Warp H',        min:-0.5, max:0.5,            apply:_synthApply('warpH','warph-amt','warph-amt-val',x=>x.toFixed(2)) },
+  warpV:     { label:'Warp V',        min:-1,   max:1,              apply:_synthApply('warpV','warpv-amt','warpv-amt-val',x=>x.toFixed(2)) },
+  syncAmt:   { label:'Sync Ratio',    min:0.1,  max:2,   step:0.01, apply:_synthApply('syncAmt','sync-amt','sync-amt-val',x=>x.toFixed(2)) },
+  foldDrive: { label:'Wavefold Drive',min:1,    max:8,              apply:_synthApply('foldDrive','fold-drive','fold-drive-val',x=>x.toFixed(1)) },
+  amAmt:     { label:'AM Depth',      min:0,    max:1,              apply:_synthApply('amAmt','am-amt','am-amt-val',x=>x.toFixed(2)) },
+  amRatio:   { label:'AM Ratio',      min:0.5,  max:8,              apply:v => setRatioParam('amRatio','am-ratio','am-ratio-val',v) },
+  noiseAmt:  { label:'Noise (wave)',  min:0,    max:0.1,            apply:_synthApply('noiseAmt','noise-amt','noise-amt-val',x=>x.toFixed(3)) },
+  waveX:     { label:'X Wave Cycle',  min:0,    max:3,   step:1,    apply:v => setBaseWave('x', WAVES[Math.max(0,Math.min(3,Math.round(v)))]) },
+  waveY:     { label:'Y Wave Cycle',  min:0,    max:3,   step:1,    apply:v => setBaseWave('y', WAVES[Math.max(0,Math.min(3,Math.round(v)))]) },
+  lfo0Rate:  { label:'LFO 1 Rate',    min:0.01, max:6,              apply:v => { lfos[0].freq = v; const e=document.getElementById('lfo0-freq'); if(e)e.value=v; const d=document.getElementById('lfo0-freq-val'); if(d)d.textContent=v.toFixed(2)+' Hz'; } },
+  lfo0Depth: { label:'LFO 1 Depth',   min:0,    max:1,              apply:v => { lfos[0].depth = v; const e=document.getElementById('lfo0-depth'); if(e)e.value=v; const d=document.getElementById('lfo0-depth-val'); if(d)d.textContent=Math.round(v*100)+'%'; } },
+  lfo1Rate:  { label:'LFO 2 Rate',    min:0.01, max:6,              apply:v => { lfos[1].freq = v; const e=document.getElementById('lfo1-freq'); if(e)e.value=v; const d=document.getElementById('lfo1-freq-val'); if(d)d.textContent=v.toFixed(2)+' Hz'; } },
+  lfo1Depth: { label:'LFO 2 Depth',   min:0,    max:1,              apply:v => { lfos[1].depth = v; const e=document.getElementById('lfo1-depth'); if(e)e.value=v; const d=document.getElementById('lfo1-depth-val'); if(d)d.textContent=Math.round(v*100)+'%'; } },
+  hue:       { label:'Colour Hue',    min:0,    max:360,            apply:v => { strokeHSL.h = v; applyStrokeHSL(); } },
+  sat:       { label:'Colour Sat',    min:0,    max:100,            apply:v => { strokeHSL.s = v; applyStrokeHSL(); } },
+  light:     { label:'Colour Luminosity', min:0, max:100,           apply:v => { strokeHSL.l = v; applyStrokeHSL(); } },
+  lineWidth: { label:'Line Width',    min:0.5,  max:8,              apply:v => { params.lineWidth = v; document.getElementById('line-width').value=v; document.getElementById('line-width-val').textContent=v.toFixed(1); } },
+  phase:     { label:'Phase δ',       min:0,    max:2,              apply:v => { params.phase = v; animPhase = v; document.getElementById('phase').value=v; document.getElementById('phase-val').textContent=v.toFixed(2)+'π'; updateStatus(); } },
+  animSpeed: { label:'Anim Speed',    min:0.1,  max:5,              apply:v => { animSpeed = v; document.getElementById('anim-speed').value=v; document.getElementById('speed-val').textContent=v.toFixed(1)+'×'; } },
+  volume:    { label:'Volume',        min:0,    max:1,              apply:v => { document.getElementById('audio-vol').value=v; document.getElementById('vol-val').textContent=Math.round(v*100)+'%'; if (masterGain) masterGain.gain.setTargetAtTime(v, audioCtx.currentTime, 0.02); } },
+  filterCutoff:{ label:'Filter Cutoff', min:0, max:1,              apply:v => { params.filterCutoff=v; const e=document.getElementById('filter-freq'); if(e)e.value=v; const d=document.getElementById('filter-freq-val'); if(d)d.textContent=fmtCutoff(v); drawWavePreview(); schedulePeriodicWaveUpdate(); } },
+  filterQ:   { label:'Filter Reso',   min:0.1,  max:20,             apply:v => { params.filterQ=v; const e=document.getElementById('filter-res'); if(e)e.value=v; const d=document.getElementById('filter-res-val'); if(d)d.textContent=v.toFixed(1); drawWavePreview(); schedulePeriodicWaveUpdate(); } },
+  dotsLine:  { label:'Dots ↔ Line',   min:0,    max:1,              apply:v => { params.dotsLine=v; const e=document.getElementById('dots-line'); if(e)e.value=v; const d=document.getElementById('dots-line-val'); if(d)d.textContent=(v>=0.999?'line':Math.round(v*100)+'%'); } },
+  preset:    { label:'Preset Scroll', min:0,    max:PRESETS.length-1, step:1, apply:v => { const p = PRESETS[Math.max(0,Math.min(PRESETS.length-1,Math.round(v)))]; if (p) applyPreset(p.fx, p.fy); } },
+  constructionView: { label:'Construction View', toggle:true, apply:b => { constructionView = b; const cb=document.getElementById('construction-view'); cb.checked=b; if (b) mode4T=0; } },
+  animatePhase:     { label:'Animate Phase',     toggle:true, apply:b => { animating = b; document.getElementById('animate').checked=b; document.getElementById('anim-speed-row').style.opacity = b ? '1' : '0.4'; } },
+  visualSwap:       { label:'Visual X/Y Swap',   toggle:true, apply:b => { visualSwap = b; updateSwapBtn(); } },
+};
+
+// Starting values per mappable target — used to restore params when MIDI disconnects.
+const MAP_DEFAULTS = {
+  fx:3, fy:2, ax:1, ay:1, fmAmount:0, fmRatio:2, pwAmount:0, shapeAmt:0, warpH:0, warpV:0,
+  syncAmt:1, foldDrive:1, amAmt:0, amRatio:2, noiseAmt:0, waveX:0, waveY:0,
+  lfo0Rate:0.5, lfo0Depth:0.5, lfo1Rate:1.0, lfo1Depth:0.5,
+  hue:79, sat:84, light:66, lineWidth:1.5, phase:0.5, animSpeed:1, volume:0.5,
+  filterCutoff:1, filterQ:0.7, dotsLine:1,
+  preset:0, constructionView:0, animatePhase:1, visualSwap:0,
+};
+
+// Return every mapped parameter to its starting value (called on MIDI disconnect).
+function resetMappedParams() {
+  const seen = new Set();
+  midiMappings.forEach(m => {
+    if (seen.has(m.key)) return;
+    seen.add(m.key);
+    const d = MAP_DEFAULTS[m.key];
+    if (d === undefined) return;
+    setTargetValue(m.key, d);
+    // clear any in-flight CC slew so it doesn't snap back to the last CC value
+    m.target01 = undefined; m.smooth = undefined;
+  });
+}
+
+// Apply a final value to a target (snap to step + clamp).
+// Toggle targets switch off at 0 and on at any value above 0.
+function setTargetValue(key, value) {
+  const t = MAP_TARGETS[key];
+  if (!t) return;
+  if (t.toggle) { t.apply(value > 0); midiLastAt = performance.now(); setActiveParam(activeLabelForKey(key)); return; }
+  if (t.step) value = Math.round(value / t.step) * t.step;
+  value = Math.max(t.min, Math.min(t.max, value));
+  t.apply(value);
+  midiLastAt = performance.now();
+  setActiveParam(activeLabelForKey(key));
+}
+
+// ── Mapping list state ────────────────────────────────────────────────────────
+let midiMappings = [];   // { id, key, ccNum, lo, hi }
+let mapLearnId = null;    // id of mapping currently learning
+let mapLearnTarget = null; // non-null flag used by onMidiMessage (mirrors mapLearnId)
+let _mapIdSeq = 1;
+
+function addMapping(key) {
+  key = key || 'fx';
+  const t = MAP_TARGETS[key];
+  midiMappings.push({ id: _mapIdSeq++, key, ccNum: null, lo: t.min ?? 0, hi: t.max ?? 1,
+                      target01: undefined, smooth: undefined,
+                      loCc: null, hiCc: null, showRangeCc: false });
+  renderMapList();
+}
+function removeMapping(id) {
+  midiMappings = midiMappings.filter(m => m.id !== id);
+  if (mapLearnId === id) { mapLearnId = null; mapLearnTarget = null; }
+  renderMapList();
+}
+function startLearn(id) {
+  mapLearnId = (mapLearnId === id) ? null : id;
+  mapLearnTarget = mapLearnId;
+  renderMapList();
+}
+function bindLearnedCC(cc) {
+  const m = midiMappings.find(x => x.id === mapLearnId);
+  if (m) m.ccNum = cc;
+  mapLearnId = null; mapLearnTarget = null;
+  renderMapList();
+}
+function flashMapInd(m) {
+  const ind = document.getElementById('map-ind-' + m.id);
+  if (ind) { ind.classList.add('active'); clearTimeout(ind._t); ind._t = setTimeout(() => ind.classList.remove('active'), 120); }
+}
+function handleMappedCC(cc, data2) {
+  const v01 = data2 / 127;
+  midiMappings.forEach(m => {
+    const t = MAP_TARGETS[m.key];
+    if (!t) return;
+    // main parameter CC
+    if (m.ccNum === cc) {
+      if (t.toggle) {
+        t.apply(data2 > 0);               // off at 0, on above 0
+        midiLastAt = performance.now();
+      } else {
+        m.target01 = v01;                 // tickMappings() slews toward this
+        if (m.smooth === undefined) m.smooth = v01;
+        m._force = true;
+      }
+      flashMapInd(m);
+    }
+    // range-setting CCs (manual-only; map across the target's full range)
+    if (!t.toggle) {
+      const span = (t.max ?? 1) - (t.min ?? 0), base = t.min ?? 0;
+      if (m.loCc !== null && m.loCc === cc) {
+        m.lo = base + v01 * span;
+        const inp = document.getElementById('map-lo-' + m.id); if (inp) inp.value = +m.lo.toFixed(3);
+        m._force = true; flashMapInd(m);
+      }
+      if (m.hiCc !== null && m.hiCc === cc) {
+        m.hi = base + v01 * span;
+        const inp = document.getElementById('map-hi-' + m.id); if (inp) inp.value = +m.hi.toFixed(3);
+        m._force = true; flashMapInd(m);
+      }
+    }
+  });
+}
+
+// CC interpolation — slews each mapping's value toward its latest target so the
+// audio/visuals don't step on the coarse 7-bit MIDI resolution.
+const MAP_SLEW_TAU = 0.045; // seconds; smaller = snappier, larger = smoother
+function tickMappings(dt) {
+  if (!Number.isFinite(dt) || dt <= 0) dt = 1 / 60;
+  const alpha = 1 - Math.exp(-dt / MAP_SLEW_TAU);
+  midiMappings.forEach(m => {
+    if (m.ccNum === null || m.target01 === undefined) return;
+    const t = MAP_TARGETS[m.key];
+    if (!t || t.toggle) return;
+    const prev = m.smooth;
+    m.smooth += (m.target01 - m.smooth) * alpha;
+    if (Math.abs(m.target01 - m.smooth) < 0.0004) m.smooth = m.target01;
+    if (m.smooth !== prev || m._force) {
+      m._force = false;
+      setTargetValue(m.key, m.lo + m.smooth * (m.hi - m.lo));
+    }
+  });
+}
+
+function makeCcNumInput(getVal, setVal, title) {
+  const inp = document.createElement('input');
+  inp.type = 'number'; inp.className = 'map-cc-num'; inp.min = 0; inp.max = 127; inp.step = 1;
+  inp.placeholder = '–'; inp.title = title || 'CC #';
+  const v = getVal();
+  inp.value = (v === null || v === undefined) ? '' : v;
+  inp.addEventListener('input', () => {
+    const raw = inp.value.trim();
+    if (raw === '') { setVal(null); return; }
+    const n = parseInt(raw);
+    if (Number.isFinite(n)) setVal(Math.max(0, Math.min(127, n)));
+  });
+  return inp;
+}
+
+function renderMapList() {
+  const list = document.getElementById('map-list');
+  list.innerHTML = '';
+  midiMappings.forEach(m => {
+    const t = MAP_TARGETS[m.key];
+    const row = document.createElement('div');
+    row.className = 'map-row' + (mapLearnId === m.id ? ' learning' : '');
+
+    // target select
+    const sel = document.createElement('select');
+    sel.className = 'map-target';
+    Object.keys(MAP_TARGETS).forEach(k => {
+      const o = document.createElement('option');
+      o.value = k; o.textContent = MAP_TARGETS[k].label;
+      if (k === m.key) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', e => {
+      m.key = e.target.value;
+      const nt = MAP_TARGETS[m.key];
+      m.lo = nt.min ?? 0; m.hi = nt.max ?? 1;
+      m.smooth = undefined; m.target01 = undefined;
+      renderMapList();
+    });
+    row.appendChild(sel);
+
+    // learn button
+    const learn = document.createElement('button');
+    learn.className = 'map-cc-btn' + (mapLearnId === m.id ? ' learning' : (m.ccNum !== null ? ' bound' : ''));
+    learn.textContent = mapLearnId === m.id ? 'learn…' : 'learn';
+    learn.addEventListener('click', () => startLearn(m.id));
+    row.appendChild(learn);
+
+    // manual CC number input (in addition to learn)
+    row.appendChild(makeCcNumInput(() => m.ccNum, v => { m.ccNum = v; updateMapBound(m); }, 'CC number'));
+
+    if (t.toggle) {
+      const hint = document.createElement('div');
+      hint.className = 'map-range';
+      hint.style.color = 'var(--muted)';
+      hint.textContent = '0 off · >0 on';
+      row.appendChild(hint);
+    } else {
+      // range lo/hi
+      const range = document.createElement('div');
+      range.className = 'map-range';
+      // Range is limited to the target's own min..max; typed values snap/clamp to it.
+      const tmin = t.min ?? 0, tmax = t.max ?? 1;
+      const clampT = v => Math.max(tmin, Math.min(tmax, v));
+      const loI = document.createElement('input');
+      loI.type = 'number'; loI.id = 'map-lo-' + m.id; loI.value = +m.lo.toFixed(3); loI.step = t.step || 'any'; loI.min = tmin; loI.max = tmax; loI.title = `min value (${tmin}…${tmax})`;
+      loI.addEventListener('input', e => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) m.lo = clampT(v); });
+      loI.addEventListener('change', e => { let v = parseFloat(e.target.value); v = Number.isFinite(v) ? clampT(v) : tmin; m.lo = v; e.target.value = +v.toFixed(3); });
+      const hiI = document.createElement('input');
+      hiI.type = 'number'; hiI.id = 'map-hi-' + m.id; hiI.value = +m.hi.toFixed(3); hiI.step = t.step || 'any'; hiI.min = tmin; hiI.max = tmax; hiI.title = `max value (${tmin}…${tmax})`;
+      hiI.addEventListener('input', e => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) m.hi = clampT(v); });
+      hiI.addEventListener('change', e => { let v = parseFloat(e.target.value); v = Number.isFinite(v) ? clampT(v) : tmax; m.hi = v; e.target.value = +v.toFixed(3); });
+      range.appendChild(loI);
+      const dash = document.createElement('span'); dash.textContent = '→'; range.appendChild(dash);
+      range.appendChild(hiI);
+      row.appendChild(range);
+
+      // range-CC expander toggle
+      const rcBtn = document.createElement('button');
+      rcBtn.className = 'map-rangecc-btn' + (m.showRangeCc ? ' open' : '');
+      rcBtn.textContent = '⇆'; rcBtn.title = 'assign CCs to range min/max';
+      rcBtn.addEventListener('click', () => { m.showRangeCc = !m.showRangeCc; renderMapList(); });
+      row.appendChild(rcBtn);
+    }
+
+    // activity indicator
+    const ind = document.createElement('span');
+    ind.className = 'map-ind'; ind.id = 'map-ind-' + m.id;
+    row.appendChild(ind);
+
+    // remove
+    const rm = document.createElement('button');
+    rm.className = 'map-remove'; rm.textContent = '×'; rm.title = 'remove';
+    rm.addEventListener('click', () => removeMapping(m.id));
+    row.appendChild(rm);
+
+    // expandable range-CC inputs (manual CC entry only, no learn)
+    if (!t.toggle && m.showRangeCc) {
+      const rc = document.createElement('div');
+      rc.className = 'map-rangecc';
+      const l1 = document.createElement('label'); l1.textContent = 'min CC';
+      const l2 = document.createElement('label'); l2.textContent = 'max CC';
+      rc.appendChild(l1);
+      rc.appendChild(makeCcNumInput(() => m.loCc, v => { m.loCc = v; }, 'CC controlling range min'));
+      rc.appendChild(l2);
+      rc.appendChild(makeCcNumInput(() => m.hiCc, v => { m.hiCc = v; }, 'CC controlling range max'));
+      row.appendChild(rc);
+    }
+
+    list.appendChild(row);
+  });
+}
+
+// Update only the learn button's "bound" styling without a full re-render.
+function updateMapBound(m) {
+  const row = document.getElementById('map-ind-' + m.id);
+  if (!row) return;
+  const learn = row.parentElement.querySelector('.map-cc-btn');
+  if (learn && mapLearnId !== m.id) learn.classList.toggle('bound', m.ccNum !== null);
+}
+
+document.getElementById('map-add').addEventListener('click', () => addMapping('fx'));
+
+// ── WAV export: single-cycle waveform ────────────────────────────────────────
+// Standard single-cycle waveform: 2048 samples, 16-bit PCM. The sample rate is
+// chosen so the single cycle's natural fundamental is C0 (≈16.35 Hz): with 2048
+// frames that means SR = 2048 × C0 ≈ 33488 Hz, so the loop repeats at C0 when
+// played at its native rate. Reflects all current synth params.
+const C0_HZ = 16.351597831287414;          // C0, scientific pitch (A4 = 440)
+const SINGLE_CYCLE_SR = Math.round(2048 * C0_HZ);  // = 33488
+// Write 16-bit PCM WAV from an array of channel buffers (1 = mono, 2 = stereo).
+function samplesToWavBlob(channels, sampleRate) {
+  const numCh = channels.length;
+  const N = channels[0].length;
+  const bytesPerSample = 2;
+  const dataBytes = N * numCh * bytesPerSample;
+  const buf = new ArrayBuffer(44 + dataBytes);
+  const v = new DataView(buf);
+  let p = 0;
+  const writeStr = s => { for (let i = 0; i < s.length; i++) v.setUint8(p++, s.charCodeAt(i)); };
+  writeStr('RIFF');
+  v.setUint32(p, 36 + dataBytes, true); p += 4;
+  writeStr('WAVE');
+  writeStr('fmt ');
+  v.setUint32(p, 16, true); p += 4;                              // PCM chunk size
+  v.setUint16(p, 1, true);  p += 2;                              // format = PCM
+  v.setUint16(p, numCh, true); p += 2;                          // channels
+  v.setUint32(p, sampleRate, true); p += 4;
+  v.setUint32(p, sampleRate * numCh * bytesPerSample, true); p += 4; // byte rate
+  v.setUint16(p, numCh * bytesPerSample, true); p += 2;        // block align
+  v.setUint16(p, 16, true); p += 2;                             // bits/sample
+  writeStr('data');
+  v.setUint32(p, dataBytes, true); p += 4;
+  for (let i = 0; i < N; i++) {
+    for (let c = 0; c < numCh; c++) {
+      let s = Math.max(-1, Math.min(1, channels[c][i]));
+      v.setInt16(p, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      p += 2;
+    }
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+document.getElementById('btn-export-wav').addEventListener('click', () => {
+  const N = 2048;
+  // One carrier cycle of each axis' processed wave.
+  const xs = new Float32Array(N), ys = new Float32Array(N);
+  _audioSampling = true;
+  for (let i = 0; i < N; i++) {
+    const t = (i / N) * Math.PI * 2;
+    xs[i] = processWave(t, t, waveTypeX, 'x');
+    ys[i] = processWave(t, t, waveTypeY, 'y');
+  }
+  _audioSampling = false;
+  let channels, chTag;
+  if (audioStereo) {
+    // Stereo: X = left, Y = right. Normalise jointly to keep their balance.
+    let peak = 0;
+    for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(xs[i]), Math.abs(ys[i]));
+    if (peak > 0.0001) { const g = 0.95 / peak; for (let i = 0; i < N; i++) { xs[i] *= g; ys[i] *= g; } }
+    channels = [xs, ys];
+    chTag = 'stereo';
+  } else {
+    // Mono: sum X + Y.
+    const mono = new Float32Array(N);
+    for (let i = 0; i < N; i++) mono[i] = (xs[i] + ys[i]) * 0.5;
+    let peak = 0;
+    for (let i = 0; i < N; i++) peak = Math.max(peak, Math.abs(mono[i]));
+    if (peak > 0.0001) { const g = 0.95 / peak; for (let i = 0; i < N; i++) mono[i] *= g; }
+    channels = [mono];
+    chTag = 'mono';
+  }
+  const blob = samplesToWavBlob(channels, SINGLE_CYCLE_SR);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const fmTag = params.fmAmount > 0.05 ? `_fm${params.fmAmount.toFixed(1)}` : '';
+  const fdTag = params.foldDrive > 1.05 ? `_fold${params.foldDrive.toFixed(1)}` : '';
+  const amTag = params.amAmt > 0.01 ? `_am${params.amAmt.toFixed(2)}` : '';
+  a.href = url;
+  a.download = `lissajous_cycle_C0_${chTag}_${waveTypeX}-${waveTypeY}${fmTag}${fdTag}${amTag}.wav`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ── Audio: periodic wave reflecting all transformations ──────────────────────
+// Rebuilds a PeriodicWave from one cycle of `processWave` so the oscillators
+// actually carry the FM / warp / fold / AM character of the figure. X and Y can
+// use different base waveforms, so each oscillator gets its own wave.
+// Rebuild is driven by the render loop (low latency, coalesced) — see pwTick().
+const PW_N = 1024; // time-domain samples used to derive Fourier coefficients
+const PW_H = 256;  // number of harmonics to keep (≤ PW_N/2)
+
+function buildPeriodicWave(type, axis) {
+  if (!audioCtx) return null;
+  // Sample one period of the processed wave for the given base waveform.
+  const x = new Float32Array(PW_N);
+  _audioSampling = true;
+  for (let i = 0; i < PW_N; i++) {
+    const t = (i / PW_N) * Math.PI * 2;
+    x[i] = processWave(t, t, type, axis || 'x');
+  }
+  _audioSampling = false;
+  // Apply the same waveform filter (one cycle in the wavetable → fundamental = 1).
+  if (filterIsOn()) {
+    const wc = Math.PI * 2 * Math.min(0.49, filterHarmonics() / PW_N);
+    filterPeriodic(x, PW_N, biquadCoeffs(filterType, wc, params.filterQ));
+  }
+  // Normalize to avoid clipping at oscillator output.
+  let peak = 0;
+  for (let i = 0; i < PW_N; i++) { const a = Math.abs(x[i]); if (a > peak) peak = a; }
+  if (peak > 0.0001) { const g = 0.9 / peak; for (let i = 0; i < PW_N; i++) x[i] *= g; }
+
+  // Naive DFT for low harmonic count — fine off the audio thread.
+  const real = new Float32Array(PW_H + 1);
+  const imag = new Float32Array(PW_H + 1);
+  for (let k = 1; k <= PW_H; k++) {
+    let re = 0, im = 0;
+    const w = (2 * Math.PI * k) / PW_N;
+    for (let n = 0; n < PW_N; n++) {
+      const c = Math.cos(w * n);
+      const s = Math.sin(w * n);
+      re += x[n] * c;
+      im -= x[n] * s;
+    }
+    real[k] = (2 / PW_N) * re;
+    imag[k] = (2 / PW_N) * im;
+  }
+  return audioCtx.createPeriodicWave(real, imag, { disableNormalization: false });
+}
+
+function applyPeriodicWave() {
+  if (!audioCtx || !oscX || !oscY) return;
+  try {
+    const pwX = buildPeriodicWave(waveTypeX, 'x');
+    if (pwX) oscX.setPeriodicWave(pwX);
+    // Reuse X's wave only when both axes are truly identical (same base type and
+    // no per-axis sync difference) — otherwise build Y separately.
+    const syncDiffers = syncSingle && Math.abs(params.syncAmt - 1) > 0.001;
+    const pwY = (waveTypeY === waveTypeX && !syncDiffers) ? pwX : buildPeriodicWave(waveTypeY, 'y');
+    if (pwY) oscY.setPeriodicWave(pwY);
+  } catch (e) { /* osc may have stopped */ }
+}
+
+function hasModulation() {
+  return params.fmAmount > 0.05 ||
+         Math.abs(params.pwAmount) > 0.01 ||
+         params.shapeAmt > 0.01 ||
+         Math.abs(params.warpH) > 0.005 ||
+         Math.abs(params.warpV) > 0.02 ||
+         params.syncAmt > 1.05 ||
+         params.foldDrive > 1.05 ||
+         params.amAmt > 0.01;
+}
+
+// Marks the wave dirty; the render loop rebuilds it (coalesced, low latency).
+let pwDirty = false;
+let _lastPwBuild = 0;
+const PW_MIN_INTERVAL = 24; // ms — caps rebuild rate while still feeling instant
+function schedulePeriodicWaveUpdate() { pwDirty = true; }
+
+// Called every frame from render(), while LFO-modulated params are live so the
+// timbre tracks LFO modulation too. Rebuilds only when something changed.
+function pwTick(now) {
+  if (!audioEnabled || !oscX || !oscY) return;
+  // Track the (possibly LFO/MIDI-modulated) noise amount in real time.
+  if (noiseGain) noiseGain.gain.setTargetAtTime(Math.max(0, params.noiseAmt) * NOISE_SCALE, audioCtx.currentTime, 0.03);
+  const continuous = lfoHasSynthTargets();
+  if ((pwDirty || continuous) && now - _lastPwBuild >= PW_MIN_INTERVAL) {
+    _lastPwBuild = now;
+    pwDirty = false;
+    applyPeriodicWave();
+  }
+}
+
+// ─── PRESET EXPORT / IMPORT ───────────────────────────────────────────────────
+function serializePreset() {
+  return {
+    app: 'lissajous', version: 3,
+    params: { ...params },
+    waveTypeX, waveTypeY, visualSwap, audioStereo, syncHard, syncSingle,
+    pwInvert, warpHInvert, warpVInvert, filterType, phaseModulators,
+    animating, animSpeed, constructionView,
+    baseFreq, baseFreqMode,
+    strokeHSL: { ...strokeHSL },
+    lfos: lfos.map(l => ({ wave: l.wave, freq: l.freq, depth: l.depth, retrigger: l.retrigger, assignments: [...l.assignments] })),
+    mappings: midiMappings.map(m => ({ key: m.key, ccNum: m.ccNum, lo: m.lo, hi: m.hi, loCc: m.loCc, hiCc: m.hiCc })),
+  };
+}
+
+// Push current state into every sidebar control.
+function refreshAllControls() {
+  const setS = (id, val, dispId, fmt) => {
+    const e = document.getElementById(id); if (e) e.value = val;
+    if (dispId) { const d = document.getElementById(dispId); if (d) d.textContent = fmt(val); }
+  };
+  SYNTH_SLIDERS.forEach(([id, key, fmt]) => setS(id, params[key], id + '-val', fmt));
+  // Fraction-stepped ratio sliders (index-based).
+  { const i = ratioNearestIndex(params.fmRatio); const e=document.getElementById('fm-ratio'); if(e)e.value=i; const d=document.getElementById('fm-ratio-val'); if(d)d.textContent=RATIO_LABELS[i]; }
+  { const i = ratioNearestIndex(params.amRatio); const e=document.getElementById('am-ratio'); if(e)e.value=i; const d=document.getElementById('am-ratio-val'); if(d)d.textContent=RATIO_LABELS[i]; }
+  setS('ax', params.ax, 'ax-val', v => v.toFixed(2));
+  setS('ay', params.ay, 'ay-val', v => v.toFixed(2));
+  setS('fx', params.fx, 'fx-val', v => Number.isInteger(v) ? v : v.toFixed(1));
+  setS('fy', params.fy, 'fy-val', v => Number.isInteger(v) ? v : v.toFixed(1));
+  setS('phase', params.phase, 'phase-val', v => v.toFixed(2) + 'π');
+  document.getElementById('bg-color').value = params.bgColor;
+  applyPageBg();
+  setS('line-width', params.lineWidth, 'line-width-val', v => v.toFixed(1));
+  document.getElementById('resolution').value = params.resolution;
+  applyStrokeHSL();
+  updateSwapBtn();
+  applyAudioChannelMode();
+  setBaseWave('x', waveTypeX);
+  setBaseWave('y', waveTypeY);
+  setModWave('fm', params.fmWave || 'sine');
+  setModWave('am', params.amWave || 'sine');
+  document.getElementById('animate').checked = animating;
+  setS('anim-speed', animSpeed, 'speed-val', v => v.toFixed(1) + '×');
+  document.getElementById('anim-speed-row').style.opacity = animating ? '1' : '0.4';
+  document.getElementById('construction-view').checked = constructionView;
+  setS('trace-speed', params.traceSpeed ?? 1, 'trace-speed-val', v => v.toFixed(1) + '×');
+  setS('untraced-alpha', params.untracedAlpha ?? 0.2, 'untraced-alpha-val', v => Math.round(v * 100) + '%');
+  updateConstructionControls();
+  document.getElementById('sync-hard').checked = syncHard;
+  document.getElementById('sync-single').checked = syncSingle;
+  document.getElementById('pw-invert').checked = pwInvert;
+  document.getElementById('warph-invert').checked = warpHInvert;
+  document.getElementById('warpv-invert').checked = warpVInvert;
+  setFilterType(filterType);
+  setS('filter-freq', params.filterCutoff, 'filter-freq-val', () => fmtCutoff(params.filterCutoff));
+  setS('filter-res', params.filterQ, 'filter-res-val', v => v.toFixed(1));
+  setS('dots-line', params.dotsLine ?? 1, 'dots-line-val', v => (v >= 0.999 ? 'line' : Math.round(v*100) + '%'));
+  document.getElementById('phase-modulators').checked = phaseModulators;
+  document.getElementById('audio-vol').value = (params.volume !== undefined ? params.volume : parseFloat(document.getElementById('audio-vol').value));
+  document.getElementById('midi-note-display').textContent = Math.round(baseFreq) + ' Hz';
+  updateStatus(); highlightActivePreset();
+  buildLFOPanels();
+  renderMapList();
+  drawWavePreview();
+  syncAudioParams();
+  schedulePeriodicWaveUpdate();
+}
+
+function applyPresetData(d) {
+  if (!d || typeof d !== 'object') return;
+  if (d.params) Object.keys(params).forEach(k => { if (d.params[k] !== undefined) params[k] = d.params[k]; });
+  if (d.waveTypeX) waveTypeX = d.waveTypeX;
+  if (d.waveTypeY) waveTypeY = d.waveTypeY;
+  if (typeof d.visualSwap === 'boolean') visualSwap = d.visualSwap;
+  if (typeof d.audioStereo === 'boolean') audioStereo = d.audioStereo;
+  if (typeof d.syncHard === 'boolean') syncHard = d.syncHard;
+  if (typeof d.syncSingle === 'boolean') syncSingle = d.syncSingle;
+  if (typeof d.pwInvert === 'boolean') pwInvert = d.pwInvert;
+  if (typeof d.warpHInvert === 'boolean') warpHInvert = d.warpHInvert;
+  if (typeof d.warpVInvert === 'boolean') warpVInvert = d.warpVInvert;
+  if (d.filterType) filterType = d.filterType;
+  if (typeof d.phaseModulators === 'boolean') phaseModulators = d.phaseModulators;
+  if (typeof d.animating === 'boolean') animating = d.animating;
+  if (typeof d.animSpeed === 'number') animSpeed = d.animSpeed;
+  if (typeof d.constructionView === 'boolean') constructionView = d.constructionView;
+  if (typeof d.baseFreq === 'number') baseFreq = d.baseFreq;
+  if (d.strokeHSL) strokeHSL = { ...d.strokeHSL };
+  else if (d.params && d.params.strokeColor) strokeHSL = hexToHsl(d.params.strokeColor);
+  if (Array.isArray(d.lfos)) d.lfos.forEach((ld, i) => {
+    if (!lfos[i]) return;
+    lfos[i].wave = ld.wave || 'sine';
+    lfos[i].freq = ld.freq ?? lfos[i].freq;
+    lfos[i].depth = ld.depth ?? lfos[i].depth;
+    lfos[i].retrigger = !!ld.retrigger;
+    lfos[i].assignments = Array.isArray(ld.assignments) ? ld.assignments.filter(k => VEL_RANGES[k]) : [];
+  });
+  if (Array.isArray(d.mappings)) {
+    midiMappings = d.mappings.map(md => ({
+      id: _mapIdSeq++, key: MAP_TARGETS[md.key] ? md.key : 'fx',
+      ccNum: md.ccNum ?? null, lo: md.lo ?? 0, hi: md.hi ?? 1,
+      loCc: md.loCc ?? null, hiCc: md.hiCc ?? null,
+      showRangeCc: false, target01: undefined, smooth: undefined,
+    }));
+  }
+  animPhase = params.phase;
+  refreshAllControls();
+}
+
+document.getElementById('preset-save').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(serializePreset(), null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `lissajous_preset_${params.fx}x${params.fy}.json`; a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById('preset-load').addEventListener('click', () => document.getElementById('preset-file').click());
+document.getElementById('preset-file').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { applyPresetData(JSON.parse(r.result)); } catch (err) { alert('Invalid preset file: ' + err.message); } };
+  r.readAsText(f);
+  e.target.value = '';
+});
+
+// ─── SIDEBAR COLLAPSE ─────────────────────────────────────────────────────────
+document.getElementById('sidebar-toggle').addEventListener('click', () => {
+  document.getElementById('layout').classList.toggle('sidebar-hidden');
+  setTimeout(() => { resize(); updateRecOverlay(); }, 230);
+});
+
+// ─── VIDEO RECORDING (mp4 / webm) ─────────────────────────────────────────────
+let recAspectName = '1:1';
+let recAspect = [1, 1];
+let recZoom = 1;
+let recShowFrame = false;
+let recIncludeConstruction = false;
+let recording = false;
+let mediaRecorder = null, recChunks = [];
+let fullCanvas = null, fullCtx = null, recCanvas = null, recCtx = null;
+
+function recStatus(t) { const el = document.getElementById('rec-status'); if (el) el.textContent = t; }
+
+function recOutDims() {
+  const [aw, ah] = recAspect, base = 1080;
+  return (aw >= ah)
+    ? { w: Math.round(base * aw / ah), h: base }
+    : { w: base, h: Math.round(base * ah / aw) };
+}
+
+// Draw the figure to the full square canvas, then crop to the chosen aspect.
+// Zoom now scales the figure itself (not the crop), so the frame stays fixed.
+function captureRecFrame(phase) {
+  if (!fullCtx || !recCtx) return;
+  const F = fullCanvas.width;
+  if (recIncludeConstruction && constructionView) {
+    // Capture the construction view; preserve mode4T so it advances once per frame.
+    const saved = mode4T;
+    drawMode4(fullCtx, F, F, phase);
+    mode4T = saved;
+  } else {
+    drawLissajous(fullCtx, F, F, phase, params.resolution, Math.max(0.6, recZoom));
+  }
+  const outW = recCanvas.width, outH = recCanvas.height;
+  const a = outW / outH;
+  let cw0, ch0;
+  if (a >= 1) { cw0 = F; ch0 = F / a; } else { ch0 = F; cw0 = F * a; }
+  const cx = (F - cw0) / 2, cy = (F - ch0) / 2;
+  recCtx.fillStyle = params.bgColor;
+  recCtx.fillRect(0, 0, outW, outH);
+  recCtx.drawImage(fullCanvas, cx, cy, cw0, ch0, 0, 0, outW, outH);
+}
+
+function pickVideoMime() {
+  // CRITICAL: the mime must declare an AUDIO codec, not just the video codec.
+  // A video-only codec string (e.g. 'video/mp4;codecs=avc1.42E01E') makes Chrome mux
+  // the audio in a default/odd codec that many players silently drop — the file looks
+  // muted even though the track is present. Declaring mp4a.40.2 (AAC-LC) / opus fixes
+  // playback everywhere. Audio-bearing candidates are tried first.
+  const candidates = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4;codecs=avc1.4d002a,mp4a.40.2',
+    'video/mp4;codecs=h264,aac',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=opus',
+    'video/mp4',
+    'video/webm',
+  ];
+  return candidates.find(t => MediaRecorder.isTypeSupported(t)) || '';
+}
+
+function startRecording() {
+  if (recording) return;
+  const { w: outW, h: outH } = recOutDims();
+  recCanvas = document.createElement('canvas'); recCanvas.width = outW; recCanvas.height = outH; recCtx = recCanvas.getContext('2d');
+  const F = Math.max(outW, outH);
+  fullCanvas = document.createElement('canvas'); fullCanvas.width = F; fullCanvas.height = F; fullCtx = fullCanvas.getContext('2d');
+  const stream = recCanvas.captureStream(60);
+  // Add an audio track. Always record from the Web Audio tap (recDest) — it carries
+  // whatever is playing, internal synth OR external input (external feeds masterGain →
+  // recDest). Recording the raw getUserMedia track directly proved unreliable in
+  // Chrome (it can capture silence once the track is also consumed by the AudioContext
+  // + the muted <audio> pump), which is why external recordings came out silent even
+  // though the IN meter was live. The recDest tap is taken before the monitor mute, so
+  // recordings still contain audio with monitoring off.
+  let hasAudio = false;
+  if (audioCtx && recDest && recDest.stream && recDest.stream.getAudioTracks().length) {
+    recDest.stream.getAudioTracks().forEach(tr => { stream.addTrack(tr); hasAudio = true; });
+  } else if (inputMode === 'external' && externalStream && externalStream.getAudioTracks().length) {
+    // Fallback only if the Web Audio graph somehow isn't up.
+    externalStream.getAudioTracks().forEach(tr => { stream.addTrack(tr); hasAudio = true; });
+  }
+  const mime = pickVideoMime();
+  recChunks = [];
+  try {
+    mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 12000000, audioBitsPerSecond: 192000 } : undefined);
+  } catch (e) { recStatus('recording not supported here'); return; }
+  mediaRecorder.ondataavailable = ev => { if (ev.data && ev.data.size) recChunks.push(ev.data); };
+  mediaRecorder.onstop = () => {
+    const type = mediaRecorder.mimeType || mime || 'video/webm';
+    const ext = type.includes('mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(recChunks, { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `lissajous_${recAspectName.replace(':','x')}_${Date.now()}.${ext}`; a.click();
+    URL.revokeObjectURL(url);
+    recStatus(ext === 'mp4' ? 'saved .mp4 ✓' : 'saved .webm (mp4 not supported by this browser)');
+  };
+  mediaRecorder.start();
+  recording = true;
+  const btn = document.getElementById('rec-toggle');
+  btn.textContent = '■ stop'; btn.style.borderColor = '#f06060'; btn.style.color = '#f06060';
+  const atc = stream.getAudioTracks().length;
+  recStatus(`● recording ${outW}×${outH} (${recAspectName})${hasAudio ? ` + audio (${atc} track)` : ' (no audio — enable output)'}…`);
+}
+
+function stopRecording() {
+  if (!recording) return;
+  recording = false;
+  try { mediaRecorder.stop(); } catch (e) {}
+  const btn = document.getElementById('rec-toggle');
+  btn.textContent = '● record'; btn.style.borderColor = ''; btn.style.color = '';
+}
+
+function updateRecOverlay() {
+  const ov = document.getElementById('rec-overlay');
+  if (!ov) return;
+  if (!recShowFrame) { ov.classList.remove('active'); return; }
+  const area = document.querySelector('.canvas-area');
+  const cRect = canvas.getBoundingClientRect();
+  const aRect = area.getBoundingClientRect();
+  const S = cRect.width;
+  const [aw, ah] = recAspect, a = aw / ah;
+  let fw, fh;
+  if (a >= 1) { fw = 1; fh = 1 / a; } else { fh = 1; fw = a; }
+  // Zoom scales the figure, not the crop, so the frame box stays fixed.
+  const w = fw * S, h = fh * S;
+  ov.style.left = ((cRect.left - aRect.left) + (S - w) / 2) + 'px';
+  ov.style.top  = ((cRect.top - aRect.top) + (cRect.height - h) / 2) + 'px';
+  ov.style.width = w + 'px';
+  ov.style.height = h + 'px';
+  ov.dataset.label = `${aw}:${ah}  ${Math.max(0.6, recZoom).toFixed(2)}×`;
+  ov.classList.add('active');
+}
+
+document.querySelectorAll('.wave-btn[data-aspect]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.wave-btn[data-aspect]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    recAspectName = btn.dataset.aspect;
+    recAspect = recAspectName.split(':').map(Number);
+    updateRecOverlay();
+  });
+});
+document.getElementById('rec-zoom').addEventListener('input', e => {
+  recZoom = parseFloat(e.target.value);
+  document.getElementById('rec-zoom-val').textContent = recZoom.toFixed(2) + '×';
+  updateRecOverlay();
+});
+document.getElementById('rec-show-frame').addEventListener('change', e => { recShowFrame = e.target.checked; updateRecOverlay(); });
+document.getElementById('rec-include-construction').addEventListener('change', e => { recIncludeConstruction = e.target.checked; });
+document.getElementById('rec-toggle').addEventListener('click', () => { recording ? stopRecording() : startRecording(); });
+window.addEventListener('resize', updateRecOverlay);
+
+// ── Double-click any slider to reset it to its starting value ─────────────────
+document.addEventListener('dblclick', e => {
+  const el = e.target;
+  if (el && el.matches && el.matches('input[type=range]')) {
+    el.value = el.defaultValue;                       // original HTML `value` attr
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+});
+
+// ─── EVOLVE (parameter mutation / randomisation) ──────────────────────────────
+// Reuses the CC-mapping registry (MAP_TARGETS) as the master list of mutable
+// parameters, so anything you can map to a CC can also be evolved. Each parameter
+// has an include checkbox; "Mutate" nudges every included parameter toward a random
+// value within its range by the Deviation amount (1 = fully random).
+const EVOLVE_KEYS = Object.keys(MAP_TARGETS).filter(k => k !== 'preset');
+// Default-excluded: view toggles + master volume (disruptive / non-musical).
+const EVOLVE_DEFAULT_OFF = new Set(['constructionView', 'animatePhase', 'visualSwap', 'volume']);
+const evolveInclude = {};
+EVOLVE_KEYS.forEach(k => { evolveInclude[k] = !EVOLVE_DEFAULT_OFF.has(k); });
+
+// Read a target's current value (mirror of MAP_TARGETS apply()).
+function readTarget(key) {
+  switch (key) {
+    case 'waveX': return Math.max(0, WAVES.indexOf(waveTypeX));
+    case 'waveY': return Math.max(0, WAVES.indexOf(waveTypeY));
+    case 'lfo0Rate':  return lfos[0].freq;
+    case 'lfo0Depth': return lfos[0].depth;
+    case 'lfo1Rate':  return lfos[1].freq;
+    case 'lfo1Depth': return lfos[1].depth;
+    case 'hue':   return strokeHSL.h;
+    case 'sat':   return strokeHSL.s;
+    case 'light': return strokeHSL.l;
+    case 'animSpeed': return animSpeed;
+    case 'volume': return parseFloat(document.getElementById('audio-vol').value);
+    case 'constructionView': return constructionView ? 1 : 0;
+    case 'animatePhase':     return animating ? 1 : 0;
+    case 'visualSwap':       return visualSwap ? 1 : 0;
+    default:
+      return (params[key] !== undefined) ? params[key]
+           : (MAP_DEFAULTS[key] !== undefined ? MAP_DEFAULTS[key] : 0);
+  }
+}
+
+function evolve(amount) {
+  EVOLVE_KEYS.forEach(k => {
+    if (!evolveInclude[k]) return;
+    const t = MAP_TARGETS[k];
+    if (!t) return;
+    if (t.toggle) {
+      // Flip with probability proportional to the deviation amount.
+      if (Math.random() < amount) t.apply(Math.random() < 0.5);
+      return;
+    }
+    const lo = t.min, hi = t.max;
+    let cur = readTarget(k);
+    cur = Math.max(lo, Math.min(hi, cur));
+    const rnd = lo + Math.random() * (hi - lo);
+    const nv = cur + (rnd - cur) * amount;   // amount 0 = unchanged, 1 = fully random
+    setTargetValue(k, nv);
+  });
+  animPhase = params.phase;
+  refreshAllControls();
+  syncAudioParams();
+  schedulePeriodicWaveUpdate();
+}
+
+function evolveReset() {
+  resetAll();                       // params, wave types, flags, strokeHSL → defaults
+  animSpeed = 1;
+  lfos[0].freq = 0.5; lfos[0].depth = 0.5;
+  lfos[1].freq = 1.0; lfos[1].depth = 0.5;
+  const vol = 0.5;
+  document.getElementById('audio-vol').value = vol;
+  document.getElementById('vol-val').textContent = '50%';
+  if (masterGain && audioCtx) masterGain.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.02);
+  animPhase = params.phase;
+  refreshAllControls();
+  buildLFOPanels();
+}
+
+function buildEvolveList() {
+  const cont = document.getElementById('evolve-list');
+  cont.innerHTML = '';
+  EVOLVE_KEYS.forEach(k => {
+    const label = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = evolveInclude[k];
+    cb.addEventListener('change', () => { evolveInclude[k] = cb.checked; });
+    const span = document.createElement('span');
+    span.textContent = MAP_TARGETS[k].label;
+    span.style.cssText = 'overflow:hidden;text-overflow:ellipsis';
+    label.appendChild(cb);
+    label.appendChild(span);
+    cont.appendChild(label);
+  });
+}
+
+function setAllEvolve(on) {
+  EVOLVE_KEYS.forEach(k => { evolveInclude[k] = on; });
+  document.querySelectorAll('#evolve-list input[type=checkbox]').forEach(cb => { cb.checked = on; });
+}
+
+document.getElementById('evolve-dev').addEventListener('input', e => {
+  document.getElementById('evolve-dev-val').textContent = Math.round(parseFloat(e.target.value) * 100) + '%';
+});
+document.getElementById('evolve-mutate').addEventListener('click', () => {
+  evolve(parseFloat(document.getElementById('evolve-dev').value));
+});
+document.getElementById('evolve-all').addEventListener('click', () => setAllEvolve(true));
+document.getElementById('evolve-none').addEventListener('click', () => setAllEvolve(false));
+document.getElementById('evolve-reset').addEventListener('click', evolveReset);
+
+// ─── SESSION PRESET GRID (right sidebar) ──────────────────────────────────────
+// A 4×16 pad grid storing full patches for the running session. Each pad is
+// addressable over MIDI: pad i → note (GRID_BASE_NOTE + i) on `gridChannel`, with
+// pad 0 = C1. All 64 pads fall within the MIDI note range (C1–D#6). Each pad's
+// colour is the stored patch's line colour.
+const GRID_PADS = 64;           // 4 columns × 16 rows
+const GRID_BASE_NOTE = 24;      // C1 (note 24, with C-1 = 0)
+let gridChannel = 16;           // MIDI channel (1–16) the whole grid listens on
+let gridStoreMode = false;      // false = click loads a pad, true = click stores into it
+let gridPresets = new Array(GRID_PADS).fill(null);
+let gridActiveIdx = -1;
+
+function gridPadNoteName(i) {
+  const n = GRID_BASE_NOTE + i;
+  return n <= 127 ? noteToName(n) : null;
+}
+
+function buildGrid() {
+  const grid = document.getElementById('preset-pad-grid');
+  grid.innerHTML = '';
+  for (let i = 0; i < GRID_PADS; i++) {
+    const pad = document.createElement('button');
+    pad.className = 'grid-pad';
+    pad.dataset.idx = i;
+    if (gridPadNoteName(i) === null) pad.classList.add('unaddressable');
+    pad.addEventListener('click', () => { gridStoreMode ? storeGridPad(i) : loadGridPad(i); });
+    pad.addEventListener('contextmenu', e => { e.preventDefault(); clearGridPad(i); });
+    grid.appendChild(pad);
+  }
+  renderGrid();
+}
+
+function renderGridPad(i) {
+  const pad = document.querySelector(`.grid-pad[data-idx="${i}"]`);
+  if (!pad) return;
+  const p = gridPresets[i];
+  const nm = gridPadNoteName(i);
+  pad.classList.toggle('filled', !!p);
+  pad.classList.toggle('active', i === gridActiveIdx);
+  if (p) {
+    const col = (p.params && p.params.strokeColor) || '#c8f060';
+    pad.style.background = col;
+    pad.style.borderColor = col;
+    // Pick black/white label for legibility against the patch colour.
+    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(col);
+    if (m) {
+      const lum = (0.299 * parseInt(m[1], 16) + 0.587 * parseInt(m[2], 16) + 0.114 * parseInt(m[3], 16)) / 255;
+      pad.style.color = lum > 0.55 ? '#0c0c0e' : '#f4f4f6';
+    } else pad.style.color = '#0c0c0e';
+    pad.textContent = nm || (i + 1);
+    pad.title = `Pad ${i + 1}${nm ? ' · ' + nm + ' (note ' + (GRID_BASE_NOTE + i) + ')' : ''}`
+              + `${p.params ? ' · ' + p.params.fx + ':' + p.params.fy : ''} — click to load, right-click to clear`;
+  } else {
+    pad.style.background = '';
+    pad.style.borderColor = '';
+    pad.style.color = '';
+    pad.textContent = nm || '·';
+    pad.title = `Pad ${i + 1}${nm ? ' · ' + nm + ' (note ' + (GRID_BASE_NOTE + i) + ')' : ' · not MIDI-addressable'} — empty`;
+  }
+}
+
+function renderGrid() { for (let i = 0; i < GRID_PADS; i++) renderGridPad(i); }
+
+function storeGridPad(i) {
+  gridPresets[i] = serializePreset();
+  gridActiveIdx = i;
+  renderGrid();
+}
+
+function loadGridPad(i) {
+  if (!gridPresets[i]) return;
+  applyPresetData(gridPresets[i]);
+  gridActiveIdx = i;
+  renderGrid();
+}
+
+function clearGridPad(i) {
+  gridPresets[i] = null;
+  if (gridActiveIdx === i) gridActiveIdx = -1;
+  renderGridPad(i);
+}
+
+function setGridStoreMode(on) {
+  gridStoreMode = on;
+  document.getElementById('grid-mode-load').classList.toggle('active', !on);
+  document.getElementById('grid-mode-store').classList.toggle('active', on);
+}
+
+document.getElementById('grid-mode-load').addEventListener('click', () => setGridStoreMode(false));
+document.getElementById('grid-mode-store').addEventListener('click', () => setGridStoreMode(true));
+
+// MIDI channel selector (1–16) for the whole grid.
+(() => {
+  const sel = document.getElementById('grid-channel');
+  for (let c = 1; c <= 16; c++) {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c; sel.appendChild(o);
+  }
+  sel.value = gridChannel;
+  sel.addEventListener('change', e => { gridChannel = parseInt(e.target.value) || 1; });
+})();
+
+function exportGrid() {
+  const data = { app: 'lissajous-grid', version: 1, baseNote: GRID_BASE_NOTE, channel: gridChannel, presets: gridPresets };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `lissajous_grid_${Date.now()}.json`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importGrid(obj) {
+  if (!obj || !Array.isArray(obj.presets)) { alert('Invalid grid file.'); return; }
+  gridPresets = new Array(GRID_PADS).fill(null);
+  obj.presets.slice(0, GRID_PADS).forEach((p, i) => { gridPresets[i] = p || null; });
+  if (typeof obj.channel === 'number' && obj.channel >= 1 && obj.channel <= 16) {
+    gridChannel = obj.channel;
+    document.getElementById('grid-channel').value = gridChannel;
+  }
+  gridActiveIdx = -1;
+  renderGrid();
+}
+
+document.getElementById('grid-export').addEventListener('click', exportGrid);
+document.getElementById('grid-import').addEventListener('click', () => document.getElementById('grid-file').click());
+document.getElementById('grid-file').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { importGrid(JSON.parse(r.result)); } catch (err) { alert('Invalid grid file: ' + err.message); } };
+  r.readAsText(f);
+  e.target.value = '';
+});
+
+document.getElementById('grid-toggle').addEventListener('click', () => {
+  const layout = document.getElementById('layout');
+  layout.classList.toggle('grid-hidden');
+  const hidden = layout.classList.contains('grid-hidden');
+  const btn = document.getElementById('grid-toggle');
+  btn.classList.toggle('open', !hidden);
+  btn.textContent = hidden ? 'PRESETS ▸' : 'PRESETS ◂';
+  setTimeout(() => { resize(); updateRecOverlay(); }, 230);
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+buildGrid();
+setGridStoreMode(false);
+updateConstructionControls();
+applyLabelSize();
+renderActiveParam();
+buildPresetGrid();
+highlightActivePreset();
+buildLFOPanels();
+buildEvolveList();
+addMapping('fx');   // start with one example mapping row
+updateRecOverlay();
+applyPageBg();
+
+// Warn when running from file:// — Chrome won't reveal audio-device names (you'll
+// only see "Input 1"); it works fully when served from http://localhost or https.
+(() => {
+  const note = document.getElementById('ain-protocol-note');
+  if (note && location.protocol === 'file:') {
+    note.style.display = '';
+    note.innerHTML = '⚠ Opened as a local file. Chrome won\'t show device <em>names</em> here — either set your loopback (e.g. BlackHole) as the <strong>system default input</strong> and use EXTERNAL IN, or serve this file from <strong>http://localhost</strong> to pick devices by name.';
+  }
+})();
+
+// Collapse every section except Synthesis and Ratios on startup.
+document.querySelectorAll('.section').forEach(s => {
+  if (s.id !== 'section-waveform' && s.id !== 'section-axes') s.classList.add('collapsed');
+});
+
+requestAnimationFrame(render);
+updateIntervalLabel();
+
+</script>
+</body>
+</html>
