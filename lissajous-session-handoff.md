@@ -130,7 +130,7 @@ A local dev server is configured in `.claude/launch.json`: `python3 -m http.serv
 3. Meter dead? **grant access & list devices** → pick BlackHole by name → **↻ reset audio engine** again.
 4. Still broken? **Reload the page (Cmd-R)** — nuclear reset, disposes every audio object. Then redo 1–2.
 5. **Sample-rate mismatch:** BlackHole defaults to 48 kHz; if output (speakers) is 44.1 kHz, set both to the same rate in **Audio MIDI Setup** (48000). Mismatched rates → silent-but-connected captures in Chrome.
-6. **Serve over http**, not `file://`: `python3 -m http.server 8765`, open `http://localhost:8765/lissajous%20(9)%20-%20audio-input.html`. On `file://` Chrome hides device names. Safari exposes names on `file://`.
+6. **Serve over http**, not `file://`: `python3 -m http.server 8765`, open `http://localhost:8765/paralissa.html`. On `file://` Chrome hides device names. Safari exposes names on `file://`.
 7. **Diagnostic line** under the meter shows `track: live/ended` + `(muted by OS)`. `ended`/`muted by OS` = OS killed the track → reset (2) or reload (4); re-granting won't revive that track.
 
 **Mental model:** meter moving = good (everything downstream works); meter dead but device connected = OS/device problem → reset engine → reload → check sample rates.
@@ -140,8 +140,7 @@ A local dev server is configured in `.claude/launch.json`: `python3 -m http.serv
 ---
 
 ## Files
-- `lissajous (9) - audio-input.html` — **active working file**, all changes go here
-- `lissajous (9).html` — original base file, not modified after session 3
+- `paralissa.html` — **active working file**, all changes go here
 - `.claude/launch.json` — dev server config
 
 ---
