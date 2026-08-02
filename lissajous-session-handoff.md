@@ -1,6 +1,6 @@
 # Lissajous Project — Session Handoff Context
 
-> Paste this file's contents at the start of a new Claude Code session to continue work on the lissajous project. The active file is `lissajous (9) - audio-input.html` in this same folder.
+> Paste this file's contents at the start of a new Claude Code session to continue work on the lissajous project. The active file is `index.html` in this same folder.
 
 ---
 
