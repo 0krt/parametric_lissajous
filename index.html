@@ -2,12 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Lissajous</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-text-size-adjust: 100%; }
 
   :root {
     --bg: #0c0c0e;
@@ -27,7 +29,10 @@
     font-family: 'IBM Plex Mono', monospace;
     font-size: 12px;
     height: 100vh;
+    height: 100dvh;      /* mobile browsers: exclude the collapsing toolbars */
     overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;   /* no double-tap zoom lag on the controls */
     display: flex;
     flex-direction: column;
   }
@@ -989,6 +994,155 @@
   }
   .evolve-list input[type=checkbox] { accent-color: var(--accent2); cursor: pointer; width: 11px; height: 11px; flex-shrink: 0; }
   .evolve-list label:has(input:checked) { color: var(--text); }
+
+  /* ── Phones / narrow screens ──────────────────────────────────────────────
+     Below 860px the three-column desk folds into a single column: the figure is
+     pinned to the top at a fixed height and the parameter panel underneath
+     becomes the only scrolling region. ☰ still collapses the panel — vertically
+     here — so the figure can take the whole screen.
+
+     Stacking is portrait-only. A phone held sideways is short but wide, which
+     is exactly the shape the original side-by-side layout wants; stacking there
+     leaves a strip too thin to read. */
+  @media (max-width: 860px) {
+    header {
+      padding: 10px 12px;
+      gap: 10px;
+    }
+    header h1 { font-size: 12px; }
+    header span { display: none; }        /* subtitle costs a line it can't afford */
+  }
+
+  @media (max-width: 860px) and (orientation: portrait) {
+    .layout { flex-direction: column; }
+
+    .canvas-area {
+      order: 0;
+      flex: 0 0 auto;
+      height: clamp(180px, min(46vh, 94vw), 560px);
+      height: clamp(180px, min(46dvh, 94vw), 560px);
+      padding: 8px;
+    }
+    #interval-label { bottom: 6px !important; font-size: 10px !important; }
+
+    .sidebar {
+      order: 1;
+      flex: 1 1 auto;
+      width: auto;
+      min-width: 0;
+      min-height: 0;
+      gap: 12px;
+      padding: 12px 12px calc(20px + env(safe-area-inset-bottom, 0px));
+      border-right: none;
+      border-top: 1px solid var(--border);
+      overscroll-behavior: contain;       /* don't chain to the page/pull-to-refresh */
+      -webkit-overflow-scrolling: touch;
+      transition: none;
+    }
+    .layout.sidebar-hidden .sidebar {
+      flex: 0 0 0;
+      height: 0;
+      min-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border-top: none;
+    }
+    /* basis 0, not auto — the area must not be sized by the canvas it sizes */
+    .layout.sidebar-hidden .canvas-area { flex: 1 1 0; height: auto; min-height: 0; }
+
+    /* The pads and the parameters are alternatives here, not co-tenants — one
+       phone-width column can't host both, and splitting it leaves the pads with
+       nothing but their own header. PRESETS swaps the panel; ☰ hides it. */
+    .preset-sidebar {
+      order: 2;
+      flex: 1 1 auto;
+      width: auto;
+      min-width: 0;
+      min-height: 0;
+      border-left: none;
+      border-top: 1px solid var(--border);
+      transition: none;
+    }
+    .layout.grid-hidden .preset-sidebar { display: none; }
+    .layout:not(.grid-hidden) .sidebar { display: none; }
+
+    /* Two-up header so the pads keep most of the panel. */
+    .preset-sidebar-head {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      align-items: center;
+      gap: 8px 10px;
+      padding: 10px 12px 9px;
+    }
+    .preset-sidebar-head > * { margin-bottom: 0 !important; }
+    .preset-sidebar-head .section-label { display: none; }  /* the header button names it */
+    .preset-sidebar-head .param-row,
+    .preset-sidebar-head .param-row ~ .grid-meta-row { grid-column: 1 / -1; }
+    .grid-hint { display: none; }         /* the pads need the height more */
+    /* Explicit row height: at this column count the pads' aspect-ratio doesn't
+       feed back into auto row sizing, so the rows collapse and the pads overlap. */
+    .preset-pad-grid {
+      grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+      grid-auto-rows: 46px;
+    }
+    .grid-pad { aspect-ratio: auto; font-size: 10px; }
+  }
+
+  @media (max-width: 860px) {
+    .bottom-bar { padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)); }
+
+    /* ── Touch targets ──────────────────────────────────────────────────────
+       A 4px rail is unhittable with a fingertip, so the slider's box grows to
+       30px and the rail is painted as a centred background image instead. */
+    input[type=range] {
+      height: 30px;
+      background: linear-gradient(#2c2c34, #2c2c34) center / 100% 5px no-repeat;
+      border-radius: 0;
+    }
+    input[type=range]::-webkit-slider-thumb { width: 22px; height: 22px; }
+    input[type=range]::-moz-range-track { background: transparent; height: 100%; }
+    input[type=range]::-moz-range-thumb { width: 22px; height: 22px; }
+    /* the hover growth reads as a stuck-large thumb on touch */
+    input[type=range]::-webkit-slider-thumb:hover { transform: none; }
+
+    .lfo-cc-row input[type=checkbox],
+    .lfo-targets input[type=checkbox],
+    .evolve-list input[type=checkbox],
+    .vel-toggle input[type=checkbox],
+    .checkbox-row input[type=checkbox] { width: 17px; height: 17px; }
+    .checkbox-row, .lfo-cc-row { min-height: 30px; }
+    .evolve-list { gap: 4px 10px; max-height: none; overflow: visible; }
+    .evolve-list label { padding: 4px 0; font-size: 11px; }
+
+    .wave-btn { padding: 10px 4px; }
+    .map-add-btn { padding: 10px 6px; font-size: 11px; }
+    .btn { padding: 11px 16px; }
+    .sidebar-toggle { padding: 8px 12px; font-size: 15px; }
+    .grid-toggle { padding: 8px 10px; }
+    /* ≥16px keeps iOS from zooming the page when one of these takes focus */
+    .midi-select, .midi-ch-select, select, input[type=number] { font-size: 16px; }
+    .lfo-cc-row input[type=number] { width: 56px; font-size: 16px; }
+    input[type=color] { min-height: 34px; }
+  }
+
+  /* Landscape phones keep the side-by-side layout, just tighter: a slimmer
+     panel column and less chrome, since vertical space is what's scarce. */
+  @media (max-width: 1024px) and (max-height: 520px) and (orientation: landscape) {
+    header { padding: 6px 12px; }
+    .sidebar {
+      width: 232px;
+      min-width: 232px;
+      padding: 12px 10px calc(16px + env(safe-area-inset-bottom, 0px));
+      gap: 12px;
+      overscroll-behavior: contain;
+    }
+    .canvas-area { padding: 10px; }
+    .preset-sidebar { width: 150px; min-width: 150px; }
+    .preset-pad-grid { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 40px; }
+    .grid-pad { aspect-ratio: auto; }
+    .grid-hint { display: none; }
+    .bottom-bar { padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0px)); }
+  }
 </style>
 </head>
 <body>
@@ -2518,10 +2672,14 @@ function resetAll() {
 }
 document.getElementById('btn-reset').addEventListener('click', resetAll);
 
-// Resize canvas to fit container
+// Resize canvas to fit container. The padding is read from the element rather
+// than assumed, because the mobile layout uses a much tighter one.
 function resize() {
   const area = document.querySelector('.canvas-area');
-  const size = Math.min(area.clientWidth - 48, area.clientHeight - 48, 700);
+  const cs = getComputedStyle(area);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const size = Math.max(80, Math.min(area.clientWidth - padX, area.clientHeight - padY, 700));
   const dpr = window.devicePixelRatio || 1;
   canvas.width = size * dpr;
   canvas.height = size * dpr;
@@ -2532,6 +2690,15 @@ function resize() {
 }
 
 window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 250));
+// Mobile browsers resize the viewport as their toolbars slide away, which the
+// `resize` event doesn't always report — watch the box itself.
+if (window.ResizeObserver) {
+  new ResizeObserver(() => {
+    resize();
+    try { updateRecOverlay(); } catch (e) {}
+  }).observe(document.querySelector('.canvas-area'));
+}
 resize();
 
 drawWavePreview();
