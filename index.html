@@ -995,6 +995,36 @@
   .evolve-list input[type=checkbox] { accent-color: var(--accent2); cursor: pointer; width: 11px; height: 11px; flex-shrink: 0; }
   .evolve-list label:has(input:checked) { color: var(--text); }
 
+  /* Ribbon palette picker — each swatch previews its own shadow→highlight ramp. */
+  .ribbon-swatches {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+  }
+  .ribbon-swatch {
+    position: relative;
+    height: 30px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 0;
+    overflow: hidden;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.82);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 3px;
+    transition: border-color 0.12s, box-shadow 0.12s;
+  }
+  .ribbon-swatch:hover { border-color: var(--muted); }
+  .ribbon-swatch.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  #ribbon-controls { transition: opacity 0.15s; }
+  #ribbon-controls.disabled { opacity: 0.4; pointer-events: none; }
+
   /* ── Phones / narrow screens ──────────────────────────────────────────────
      Below 860px the three-column desk folds into a single column: the figure is
      pinned to the top at a fixed height and the parameter panel underneath
@@ -1656,6 +1686,48 @@
       <button class="btn btn-primary" id="btn-export" style="width:100%;margin-top:12px">Export SVG</button>
     </div>
 
+    <div class="section" id="section-ribbon">
+      <div class="section-label">Ribbon (3D)</div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="ribbon-on">
+        <label for="ribbon-on">Draw figure as a solid band</label>
+      </div>
+      <div id="ribbon-controls">
+        <div class="param-header" style="margin:10px 0 5px"><label>Palette</label></div>
+        <div class="ribbon-swatches" id="ribbon-swatches"></div>
+        <div class="param-row" style="margin-top:10px">
+          <div class="param-header"><label>Width</label><span class="val" id="ribbon-width-val">0.11</span></div>
+          <input type="range" id="ribbon-width" min="0.01" max="0.35" step="0.005" value="0.11">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Twist</label><span class="val" id="ribbon-twist-val">2.0</span></div>
+          <input type="range" id="ribbon-twist" min="0" max="8" step="0.5" value="2">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Light</label><span class="val" id="ribbon-light-val">135°</span></div>
+          <input type="range" id="ribbon-light" min="0" max="360" step="1" value="135">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Roundness</label><span class="val" id="ribbon-round-val">55%</span></div>
+          <input type="range" id="ribbon-round" min="0" max="1" step="0.01" value="0.55">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Gloss</label><span class="val" id="ribbon-gloss-val">35%</span></div>
+          <input type="range" id="ribbon-gloss" min="0" max="1" step="0.01" value="0.35">
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="ribbon-outline">
+          <label for="ribbon-outline">Keep outline on top</label>
+        </div>
+        <div class="grid-hint" style="margin-top:8px">
+          Whole turns keep the band's two faces where they started; a half turn
+          closes it as a M&ouml;bius band, which shows a flip where it joins. Add
+          <strong>Z ratio</strong> and <strong>Depth</strong> under Figure for a
+          curve that leaves the plane as well.
+        </div>
+      </div>
+    </div>
+
     <div class="section" id="section-lfos">
       <div class="section-label">LFOs</div>
       <div id="lfo-list"></div>
@@ -1773,6 +1845,14 @@ let params = {
   rotateAngle: 0,  // figure rotation in degrees (visual)
   rotAxis: 0,      // rotation axis: 0 = Z (in-plane), 1 = Y (vertical), 2 = X (horizontal)
   fillSurface: 0,  // 1 = fill the figure's enclosed area (front + back faces)
+  ribbon: 0,          // 1 = draw the figure as a twisted, lit band (visual)
+  ribbonWidth: 0.11,  // band half-width, in figure units (0.01..0.35)
+  ribbonTwist: 2,     // turns the band makes about its own axis per lap (step 0.5)
+  ribbonLight: 135,   // light direction, degrees (135 = upper left)
+  ribbonRound: 0.55,  // cross-section curvature: 0 = flat strip, 1 = fully rounded
+  ribbonGloss: 0.35,  // specular highlight strength
+  ribbonPalette: 0,   // index into RIBBON_PALETTES
+  ribbonOutline: 0,   // 1 = keep the stroked line on top of the band
   shearAmt: 0,     // horizontal shear of the figure (-1..1, visual)
   trailAmt: 0,     // frame persistence 0..0.97 (phosphor-style afterglow, visual)
   mirrorMode: 0,   // 0 = off, 1 = mirror X, 2 = mirror Y, 3 = 4-fold kaleidoscope
@@ -1966,8 +2046,9 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom) {
 
   const cx = w / 2, cy = h / 2;
   const pad = Math.min(w, h) * 0.034;
-  const rx = (w / 2 - pad) * ax * zoom;
-  const ry = (h / 2 - pad) * ay * zoom;
+  const fit = ribbonFit();     // room for the band's half-width, if it is on
+  const rx = (w / 2 - pad) * ax * zoom * fit;
+  const ry = (h / 2 - pad) * ay * zoom * fit;
 
   // Build the per-axis sample sequences first so the filter (a waveform stage) can
   // process them before they're drawn.
@@ -2036,13 +2117,34 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom) {
     targetCtx.fillStyle = strokeColor;   // dots mode fills with the stroke colour
   }
 
+  // ── Ribbon: the figure as a lit, twisted band ───────────────────────────────
+  // The sampled span retraces the closed figure `laps` times, so the twist is
+  // counted per lap — every lap then lands on the same band and the copies
+  // coincide instead of braiding.
+  const ribbonOn = !!params.ribbon && params.ribbonWidth > 0.002;
+  if (ribbonOn) {
+    const laps = Math.max(1, Math.round(span * gcd(fx, fy) / (Math.PI * 2)));
+    drawRibbon(targetCtx, (u, out) => {
+      const i = Math.min(resolution, Math.round(u * resolution));
+      const xs = sxArr[i], ys = syArr[i];
+      out.x = visualSwap ? ys : xs;
+      out.y = visualSwap ? xs : ys;
+      out.z = _xf.z ? Math.sin(zRatio * (i / resolution) * span) : 0;
+    }, laps, { cx, cy, rx, ry, mirrors, steps: ribbonSteps(resolution, mirrors.length, Math.min(w, h)) });
+    targetCtx.strokeStyle = strokeColor;
+    targetCtx.fillStyle = strokeColor;
+    targetCtx.lineWidth = lineWidth;
+  }
+  // The band replaces the line unless the outline is asked for explicitly.
+  const strokeOn = !ribbonOn || !!params.ribbonOutline;
+
   const dl = params.dotsLine ?? 1;
   // Dots ↔ Line is one continuous morph: the figure is always a stroked path, and
   // the slider drives a round-capped dash pattern. Zero-length dashes with round
   // caps ARE dots, so sparse dots → beads → dashes → solid line with no jump at
   // the top of the slider (the old hard switch from arcs to a line).
   let dashOn = false;
-  if (dl < 0.999) {
+  if (dl < 0.999 && strokeOn) {
     // Coarse path-length estimate so the dash period lands in real pixels.
     let pathLen = 0;
     const S = Math.min(resolution, 1024), [m0x, m0y] = mirrors[0];
@@ -2070,13 +2172,13 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom) {
     }
   };
 
-  drawFigure(0);
+  if (strokeOn) drawFigure(0);
 
   // Unison ghosts — the visual body of the detuned pair: two copies whose X axis
   // leads / lags by ±unisonOffsetCycles() of one X cycle. Separation grows with
   // Detune and precesses over time, the visual analogue of audible beating; Mix
   // alone already separates them slightly, so the doubling shows immediately.
-  if ((params.unisonMix || 0) > 0.01) {
+  if (strokeOn && (params.unisonMix || 0) > 0.01) {
     const k = Math.round(unisonOffsetCycles() * resolution / cyclesX) % resolution;
     if (k > 0) {
       targetCtx.globalAlpha = Math.min(1, params.unisonMix * 0.55);
@@ -2164,6 +2266,32 @@ function figureXform(px, py, zArg, zFlip) {
   _Q.x = px; _Q.y = py;
 }
 
+// Rotation only — no perspective, no shear, no translation. Shading needs the
+// band's surface normal in view space, and a normal must not be projected.
+const _V3 = { x: 0, y: 0, z: 0 };
+function figureRotateVec(vx, vy, vz) {
+  if (_xf.rot) {
+    const c = _xf.c, s = _xf.s;
+    if (_xf.axis === 1)      { const nx = vx * c + vz * s; vz = -vx * s + vz * c; vx = nx; } // Y axis
+    else if (_xf.axis === 2) { const ny = vy * c + vz * s; vz = -vy * s + vz * c; vy = ny; } // X axis
+    else                     { const nx = vx * c - vy * s; vy = vx * s + vy * c; vx = nx; } // Z: in-plane
+  }
+  _V3.x = vx; _V3.y = vy; _V3.z = vz;
+}
+
+// figureXform for a point that carries its own z instead of deriving one from the
+// z oscillator's phase — the ribbon's edges leave the curve's plane as the band
+// twists, so they need real 3D coordinates. Also reports the rotated depth, which
+// is the sort key that makes the band pass over and under itself correctly.
+const _Q3 = { x: 0, y: 0, z: 0 };
+function figureXform3(px, py, pz) {
+  figureRotateVec(px, py, pz);
+  let x = _V3.x, y = _V3.y; const z = _V3.z;
+  if (_xf.K > 0.001 && z !== 0) { const pf = 1 / Math.max(0.35, 1 + _xf.K * z); x *= pf; y *= pf; }
+  if (Math.abs(_xf.sh) > 1e-3) x += _xf.sh * y;
+  _Q3.x = x; _Q3.y = y; _Q3.z = z;
+}
+
 // Trail persistence → background alpha. Cubed response so the low/mid slider
 // range is already clearly visible (0.5 → alpha 0.125, long trails).
 function trailAlpha() {
@@ -2212,6 +2340,222 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+// ── Ribbon surface ───────────────────────────────────────────────────────────
+// The figure as a solid twisted band instead of a line. A strip of finite width
+// is swept along the curve, rotating about its own axis as it goes, and every
+// quad is shaded from the band's real 3D surface normal — so where the band
+// turns edge-on it narrows and darkens, and where it faces the light it flares.
+// Two things make it read as a solid object rather than a painted outline:
+//
+//   · each quad is filled with a gradient ACROSS the band, taken from normals
+//     tilted either side of the surface (Roundness). That is the curvature
+//     shading — a flat strip lit uniformly looks like paper, a strip whose
+//     normal sweeps across its width looks like a rolled surface.
+//   · quads are painted back to front by their rotated depth, so the band
+//     occludes itself at every crossing.
+//
+// The band's edges leave the curve's plane as it twists, which is where the
+// depth comes from even when the figure itself is flat.
+
+const RIBBON_PALETTES = [
+  // `stops` run shadow → highlight. MONO has none: it is built from the current
+  // stroke colour so the band follows the palette knob like everything else.
+  { id: 'mono',   label: 'MONO'   },
+  { id: 'ice',    label: 'ICE',    stops: ['#04121d', '#0b4570', '#3f93cc', '#a8d8f2', '#f2fbff'] },
+  { id: 'copper', label: 'COPPER', stops: ['#180702', '#5e2510', '#b8642c', '#eda863', '#fff0d2'] },
+  { id: 'magma',  label: 'MAGMA',  stops: ['#0d0413', '#4a1046', '#a52a4a', '#e86b34', '#ffd98d'] },
+  { id: 'jade',   label: 'JADE',   stops: ['#03120e', '#0a4436', '#1d8f6b', '#6fd6a8', '#e2fff2'] },
+  { id: 'violet', label: 'VIOLET', stops: ['#0a0518', '#2e1a63', '#6b46c8', '#a98cf0', '#eee6ff'] },
+  { id: 'steel',  label: 'STEEL',  stops: ['#08090c', '#2b323d', '#6d7887', '#b9c4d2', '#ffffff'] },
+  { id: 'gold',   label: 'GOLD',   stops: ['#140c02', '#553a08', '#a8811a', '#e6c352', '#fff6cf'] },
+  { id: 'ember',  label: 'EMBER',  stops: ['#100205', '#4d0710', '#a81f1c', '#e8752a', '#ffe2a8'] },
+];
+
+const RIBBON_LUT_N = 256;   // stays inside a Uint8 index; rebuilt only on change
+let _ribLut = null, _ribLutKey = '';
+
+// Shadow → highlight ramp built from the stroke colour, for the MONO palette.
+function ribbonMonoStops(hex) {
+  const { h, s } = hexToHsl(hex);
+  return [hslToHex(h, Math.min(100, s * 0.9), 5), hslToHex(h, s, 20),
+          hslToHex(h, s, 42), hex, hslToHex(h, Math.min(100, s * 0.45), 93)];
+}
+
+// The ramp as a table of ready-made colour strings. Gradient stops need strings,
+// and the band asks for thousands of them per frame; pre-quantising the ramp
+// keeps the per-frame work down to array lookups.
+function ribbonLut() {
+  const pi = Math.max(0, Math.min(RIBBON_PALETTES.length - 1, Math.round(params.ribbonPalette || 0)));
+  const key = pi + '|' + params.strokeColor;
+  if (_ribLutKey === key && _ribLut) return _ribLut;
+  const pal = RIBBON_PALETTES[pi];
+  const stops = (pal.stops || ribbonMonoStops(params.strokeColor)).map(hx => {
+    const c = hx.replace('#', '');
+    return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
+  });
+  const lut = new Array(RIBBON_LUT_N);
+  for (let i = 0; i < RIBBON_LUT_N; i++) {
+    const t = (i / (RIBBON_LUT_N - 1)) * (stops.length - 1);
+    const a = Math.min(stops.length - 1, Math.floor(t)), b = Math.min(stops.length - 1, a + 1), f = t - a;
+    const A = stops[a], B = stops[b];
+    lut[i] = `rgb(${Math.round(A[0] + (B[0] - A[0]) * f)},${Math.round(A[1] + (B[1] - A[1]) * f)},${Math.round(A[2] + (B[2] - A[2]) * f)})`;
+  }
+  _ribLut = lut; _ribLutKey = key;
+  return lut;
+}
+
+const RIBBON_MAX_QUADS = 1100;
+const _RS = { x: 0, y: 0, z: 0 };   // sampler output, in raw amplitude space
+let _rib = null;
+function ribbonBuffers(n) {
+  if (!_rib || _rib.n < n) {
+    _rib = { n,
+      bx: new Float64Array(n), by: new Float64Array(n), bz: new Float64Array(n),
+      px1: new Float64Array(n), py1: new Float64Array(n),   // + edge, projected
+      px2: new Float64Array(n), py2: new Float64Array(n),   // − edge, projected
+      dz: new Float64Array(n),                              // depth, for sorting
+      s1: new Uint8Array(n), sm: new Uint8Array(n), s2: new Uint8Array(n),
+      ord: new Int32Array(n) };
+  }
+  return _rib;
+}
+
+// How many quads to spend on the band. Each is a separate antialiased fill, so
+// this is the cost knob: enough that a quad is a couple of pixels long at the
+// size the figure is actually drawn, and no more. Splitting the budget across
+// mirror copies keeps a 4-fold kaleidoscope costing about what one figure does.
+function ribbonSteps(resolution, mirrorCount, sizePx) {
+  const budget = Math.min(RIBBON_MAX_QUADS,
+                          Math.max(240, Math.round(sizePx * 1.5)),
+                          Math.max(240, Math.round(resolution / 2)));
+  return Math.max(96, Math.round(budget / mirrorCount));
+}
+
+// The band sticks out past the curve by its half-width, so the figure is pulled
+// in by that much to keep it inside the frame.
+function ribbonFit() {
+  return params.ribbon ? 1 - Math.min(0.45, Math.max(0, params.ribbonWidth || 0)) : 1;
+}
+
+// `sample(u, out)` gives the curve in raw amplitude space for u over one closed
+// traversal; `laps` is how many times that traversal retraces the same figure,
+// so the twist can be expressed per lap and still close up.
+function drawRibbon(g, sample, laps, geo) {
+  const { cx, cy, rx, ry, mirrors } = geo;
+  const steps = geo.steps, N = steps + 1;
+  const B = ribbonBuffers(N);
+  const lut = ribbonLut(), LN = RIBBON_LUT_N - 1;
+  const hw = Math.max(0.002, params.ribbonWidth || 0);
+  const turns = (params.ribbonTwist || 0) * Math.max(1, laps);
+  const gloss = params.ribbonGloss ?? 0;
+  const rho = (params.ribbonRound ?? 0.5) * 1.15;   // normal tilt at the band's edges
+  const cr = Math.cos(rho), sr = Math.sin(rho);
+  const la = ((params.ribbonLight || 0) * Math.PI) / 180;
+  // Canvas y runs down, and −z is toward the viewer, so the light sits in front.
+  let Lx = Math.cos(la), Ly = -Math.sin(la), Lz = -0.8;
+  const Ll = Math.hypot(Lx, Ly, Lz) || 1; Lx /= Ll; Ly /= Ll; Lz /= Ll;
+  const AMB = 0.16;
+
+  // Lambert + specular for a normal, returned as an index into the ramp. The
+  // band is two-sided: its back face is lit too, just muted, so a twist reads as
+  // a turn rather than a hole.
+  const shadeIdx = (nx, ny, nz) => {
+    figureRotateVec(nx, ny, nz);
+    let vx = _V3.x, vy = _V3.y, vz = _V3.z;
+    const nl = Math.hypot(vx, vy, vz) || 1; vx /= nl; vy /= nl; vz /= nl;
+    const d = vx * Lx + vy * Ly + vz * Lz;
+    let s = AMB + (1 - AMB) * Math.abs(d) * (vz < 0 ? 1 : 0.55);
+    if (gloss > 0.001) {
+      const rv = Lz - 2 * d * vz;                        // reflected ray vs the eye
+      if (rv > 0) s += Math.pow(rv, 20) * gloss * 1.6;
+    }
+    return Math.max(0, Math.min(LN, Math.round(s * LN)));
+  };
+
+  for (let j = 0; j <= steps; j++) {
+    sample(j / steps, _RS);
+    B.bx[j] = _RS.x; B.by[j] = _RS.y; B.bz[j] = _RS.z;
+  }
+
+  for (let j = 0; j <= steps; j++) {
+    // Central-difference tangent, wrapping across the seam of the closed curve.
+    const jp = j === steps ? 1 : j + 1, jm = j === 0 ? steps - 1 : j - 1;
+    let tx = B.bx[jp] - B.bx[jm], ty = B.by[jp] - B.by[jm], tz = B.bz[jp] - B.bz[jm];
+    const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+    // Frame about the tangent, from a fixed up vector (swapped near the poles).
+    const ux = 0, uy = Math.abs(tz) > 0.94 ? 1 : 0, uz = Math.abs(tz) > 0.94 ? 0 : 1;
+    let fx = ty * uz - tz * uy, fy = tz * ux - tx * uz, fz = tx * uy - ty * ux;
+    const fl = Math.hypot(fx, fy, fz) || 1; fx /= fl; fy /= fl; fz /= fl;
+    const gx = fy * tz - fz * ty, gy = fz * tx - fx * tz, gz = fx * ty - fy * tx;
+
+    const ph = TWO_PI * turns * (j / steps);
+    const cp = Math.cos(ph), sp = Math.sin(ph);
+    // Half-width direction and surface normal: the frame rotated by the twist.
+    const ex = fx * cp + gx * sp, ey = fy * cp + gy * sp, ez = fz * cp + gz * sp;
+    const sx = -fx * sp + gx * cp, sy = -fy * sp + gy * cp, sz = -fz * sp + gz * cp;
+
+    figureXform3(B.bx[j] + ex * hw, B.by[j] + ey * hw, B.bz[j] + ez * hw);
+    B.px1[j] = _Q3.x; B.py1[j] = _Q3.y; const z1 = _Q3.z;
+    figureXform3(B.bx[j] - ex * hw, B.by[j] - ey * hw, B.bz[j] - ez * hw);
+    B.px2[j] = _Q3.x; B.py2[j] = _Q3.y;
+    B.dz[j] = (z1 + _Q3.z) * 0.5;
+
+    // Rounded cross-section: the normal tilted ±rho about the tangent gives the
+    // two edge shades, the untilted one the centre. Rodrigues, simplified — the
+    // normal is perpendicular to the tangent, so the parallel term drops out.
+    const kx = ty * sz - tz * sy, ky = tz * sx - tx * sz, kz = tx * sy - ty * sx;
+    B.sm[j] = shadeIdx(sx, sy, sz);
+    B.s1[j] = shadeIdx(sx * cr + kx * sr, sy * cr + ky * sr, sz * cr + kz * sr);
+    B.s2[j] = shadeIdx(sx * cr - kx * sr, sy * cr - ky * sr, sz * cr - kz * sr);
+  }
+
+  // Painter's algorithm, far quads first.
+  const ord = B.ord.subarray(0, steps);
+  for (let j = 0; j < steps; j++) ord[j] = j;
+  const dz = B.dz;
+  ord.sort((a, b) => (dz[b] + dz[b + 1]) - (dz[a] + dz[a + 1]));
+
+  const OVER = 0.5;   // per-end overlap, px
+  for (const [mx, my] of mirrors) {
+    for (let q = 0; q < steps; q++) {
+      const j = ord[q], k = j + 1;
+      let ax1 = cx + rx * B.px1[j] * mx, ay1 = cy + ry * B.py1[j] * my;
+      let ax2 = cx + rx * B.px1[k] * mx, ay2 = cy + ry * B.py1[k] * my;
+      let bx1 = cx + rx * B.px2[j] * mx, by1 = cy + ry * B.py2[j] * my;
+      let bx2 = cx + rx * B.px2[k] * mx, by2 = cy + ry * B.py2[k] * my;
+      const m1x = (ax1 + ax2) * 0.5, m1y = (ay1 + ay2) * 0.5;
+      const m2x = (bx1 + bx2) * 0.5, m2y = (by1 + by2) * 0.5;
+      // Two antialiased fills meeting on a shared edge leave a hairline of
+      // background showing between them. Stretching each quad half a pixel past
+      // both ends makes neighbours overlap instead — far cheaper than stroking
+      // every quad, which on its own cost more than all the fills together.
+      let ux = ax2 - ax1, uy = ay2 - ay1;
+      const ul = Math.hypot(ux, uy) || 1; ux = (ux / ul) * OVER; uy = (uy / ul) * OVER;
+      let vx = bx2 - bx1, vy = by2 - by1;
+      const vl = Math.hypot(vx, vy) || 1; vx = (vx / vl) * OVER; vy = (vy / vl) * OVER;
+      ax1 -= ux; ay1 -= uy; ax2 += ux; ay2 += uy;
+      bx1 -= vx; by1 -= vy; bx2 += vx; by2 += vy;
+
+      const cm = lut[(B.sm[j] + B.sm[k]) >> 1];
+      let paint = cm;
+      // Edge-on, the two edges project onto each other and a gradient between
+      // them is degenerate — the flat centre shade is the right answer anyway.
+      if (Math.hypot(m2x - m1x, m2y - m1y) > 0.6) {
+        const grad = g.createLinearGradient(m1x, m1y, m2x, m2y);
+        grad.addColorStop(0, lut[(B.s1[j] + B.s1[k]) >> 1]);
+        grad.addColorStop(0.5, cm);
+        grad.addColorStop(1, lut[(B.s2[j] + B.s2[k]) >> 1]);
+        paint = grad;
+      }
+      g.fillStyle = paint;
+      g.beginPath();
+      g.moveTo(ax1, ay1); g.lineTo(ax2, ay2); g.lineTo(bx2, by2); g.lineTo(bx1, by1);
+      g.closePath();
+      g.fill();
+    }
+  }
+}
+
 // ── Mode 4 ───────────────────────────────────────────────────────────────────
 let mode4T = 0;
 let _m4BufX = new Float64Array(0), _m4BufY = new Float64Array(0);
@@ -2227,8 +2571,9 @@ function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
   const figX = margin, figY = margin;
   const figW = w - margin, figH = h - margin;
   const cx = figX + figW / 2, cy = figY + figH / 2;
-  const rx = (figW / 2 - pad) * ax;
-  const ry = (figH / 2 - pad) * ay;
+  const m4Fit = ribbonFit();   // room for the band's half-width, if it is on
+  const rx = (figW / 2 - pad) * ax * m4Fit;
+  const ry = (figH / 2 - pad) * ay * m4Fit;
 
   // True fundamental period so cycle counts read correctly (e.g. 2:1 → 2 & 1).
   const T = TWO_PI / gcd(fx, fy);
@@ -2348,11 +2693,25 @@ function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
     }
   }
 
+  // Ribbon, as in the main view. Here the samplers already walk exactly one lap
+  // of the figure (τ over the true period T), so the twist count needs no
+  // per-lap correction.
+  const m4Ribbon = !!params.ribbon && params.ribbonWidth > 0.002;
+  if (m4Ribbon) {
+    drawRibbon(ctx, (u, out) => {
+      const τ = u * T;
+      out.x = hAt(τ); out.y = vAt(τ);
+      out.z = _xf.z ? Math.sin(fzr * τ) : 0;
+    }, 1, { cx, cy, rx, ry, mirrors: m4Mirrors, steps: ribbonSteps(res, m4Mirrors.length, Math.min(figW, figH)) });
+    ctx.lineWidth = lineWidth;
+  }
+  const m4Stroke = !m4Ribbon || !!params.ribbonOutline;
+
   // Dots ↔ Line applies here too — same continuous dash morph as the main view.
   // Path length is estimated from one traced lap of the figure box.
   const dl4 = params.dotsLine ?? 1;
   let m4Dash = null;
-  if (dl4 < 0.999) {
+  if (dl4 < 0.999 && m4Stroke) {
     let pathLen = 0, lx = 0, ly = 0;
     const S = Math.min(res, 512), [g0x, g0y] = m4Mirrors[0];
     for (let d = 0; d <= S; d++) {
@@ -2368,10 +2727,10 @@ function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
   // Full Lissajous (dim = the untraced part), every mirror image.
   ctx.strokeStyle = hexToRgba(strokeColor, Math.max(0, Math.min(1, params.untracedAlpha)));
   if (!m4Dash) ctx.lineWidth = lineWidth;
-  for (const [mx, my] of m4Mirrors) { m4Path(0, mx, my, false, false); ctx.stroke(); }
+  if (m4Stroke) for (const [mx, my] of m4Mirrors) { m4Path(0, mx, my, false, false); ctx.stroke(); }
 
   // Unison ghosts (± detune copies), dimmer than the untraced figure.
-  if ((params.unisonMix || 0) > 0.01) {
+  if (m4Stroke && (params.unisonMix || 0) > 0.01) {
     const gxy = gcd(fx, fy);
     const τOff = ((unisonOffsetCycles() % 1) * T) / (fx / gxy);   // in X-cycles
     if (τOff > 0.0001) {
@@ -3635,12 +3994,18 @@ document.getElementById('dots-line').addEventListener('input', e => {
 const fmtDeg   = v => Math.round(v) + '°';
 const fmtTrail = v => v < 0.01 ? 'off' : Math.round(v * 100) + '%';
 const fmtZ     = v => v < 0.01 ? 'off' : (Number.isInteger(v) ? v : v.toFixed(1));
+const fmtPct   = v => Math.round(v * 100) + '%';
 const VISUAL_SLIDERS = [
   ['rotate-angle', 'rotateAngle', fmtDeg],
   ['shear-amt',    'shearAmt',    v => v.toFixed(2)],
   ['trail-amt',    'trailAmt',    fmtTrail],
   ['fz',           'fz',          fmtZ],
   ['az',           'az',          v => Math.round(v * 100) + '%'],
+  ['ribbon-width', 'ribbonWidth', v => v.toFixed(3)],
+  ['ribbon-twist', 'ribbonTwist', v => v.toFixed(1)],
+  ['ribbon-light', 'ribbonLight', fmtDeg],
+  ['ribbon-round', 'ribbonRound', fmtPct],
+  ['ribbon-gloss', 'ribbonGloss', fmtPct],
 ];
 VISUAL_SLIDERS.forEach(([id, key, fmt]) => {
   document.getElementById(id).addEventListener('input', e => {
@@ -3673,6 +4038,38 @@ document.querySelectorAll('.wave-btn[data-rotaxis]').forEach(btn => {
 
 document.getElementById('rotate-spin').addEventListener('change', e => { rotSpin = e.target.checked; });
 document.getElementById('fill-surface').addEventListener('change', e => { params.fillSurface = e.target.checked ? 1 : 0; });
+
+// ── Ribbon controls ──────────────────────────────────────────────────────────
+function setRibbonOn(on) {
+  params.ribbon = on ? 1 : 0;
+  document.getElementById('ribbon-on').checked = !!on;
+  document.getElementById('ribbon-controls').classList.toggle('disabled', !on);
+}
+function setRibbonPalette(i) {
+  i = Math.max(0, Math.min(RIBBON_PALETTES.length - 1, Math.round(i)));
+  params.ribbonPalette = i;
+  document.querySelectorAll('.ribbon-swatch').forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset.pal) === i));
+}
+// MONO previews the stroke colour, so its swatch is rebuilt whenever that changes.
+function buildRibbonSwatches() {
+  const host = document.getElementById('ribbon-swatches');
+  host.innerHTML = '';
+  RIBBON_PALETTES.forEach((p, i) => {
+    const stops = p.stops || ribbonMonoStops(params.strokeColor);
+    const b = document.createElement('button');
+    b.className = 'ribbon-swatch';
+    b.dataset.pal = i;
+    b.title = p.label;
+    b.textContent = p.label;
+    b.style.background = `linear-gradient(105deg, ${stops.join(', ')})`;
+    b.addEventListener('click', () => setRibbonPalette(i));
+    host.appendChild(b);
+  });
+  setRibbonPalette(params.ribbonPalette || 0);
+}
+document.getElementById('ribbon-on').addEventListener('change', e => setRibbonOn(e.target.checked));
+document.getElementById('ribbon-outline').addEventListener('change', e => { params.ribbonOutline = e.target.checked ? 1 : 0; });
 
 // Unison: params + push straight onto the live oscillator pair.
 const UNISON_SLIDERS = [
@@ -4182,9 +4579,16 @@ function applyStrokeHSL() {
   params.strokeColor = hex;
   document.getElementById('stroke-color').value = hex;
   updateHSLSliders();
+  refreshMonoSwatch();
+}
+// The MONO ribbon ramp is derived from the stroke colour, so its swatch has to
+// follow it. (The ramp itself is rebuilt on demand — see ribbonLut.)
+function refreshMonoSwatch() {
+  const sw = document.querySelector('.ribbon-swatch[data-pal="0"]');
+  if (sw) sw.style.background = `linear-gradient(105deg, ${ribbonMonoStops(params.strokeColor).join(', ')})`;
 }
 // Keep HSL state in sync when the colour picker is used manually.
-document.getElementById('stroke-color').addEventListener('input', e => { strokeHSL = hexToHsl(e.target.value); updateHSLSliders(); });
+document.getElementById('stroke-color').addEventListener('input', e => { strokeHSL = hexToHsl(e.target.value); updateHSLSliders(); refreshMonoSwatch(); });
 
 // HSL sliders in the Render section
 ['h','s','l'].forEach(comp => {
@@ -4240,6 +4644,14 @@ const MAP_TARGETS = {
   rotAxis:   { label:'Rotation Axis', min:0,    max:2,   step:1,    apply:v => setRotAxis(v) },
   rotSpin:   { label:'Rotate Spin',   toggle:true, apply:b => { rotSpin = b; const cb=document.getElementById('rotate-spin'); if (cb) cb.checked = b; } },
   fillSurface:{ label:'Fill Surface', toggle:true, apply:b => { params.fillSurface = b ? 1 : 0; const cb=document.getElementById('fill-surface'); if (cb) cb.checked = b; } },
+  ribbon:      { label:'Ribbon',        toggle:true, apply:b => setRibbonOn(b) },
+  ribbonWidth: { label:'Ribbon Width',  min:0.01, max:0.35,           apply:v => setSliderParam('ribbonWidth','ribbon-width','ribbon-width-val',x=>x.toFixed(3),v) },
+  ribbonTwist: { label:'Ribbon Twist',  min:0,    max:8,   step:0.5,  apply:v => setSliderParam('ribbonTwist','ribbon-twist','ribbon-twist-val',x=>x.toFixed(1),v) },
+  ribbonLight: { label:'Ribbon Light',  min:0,    max:360,            apply:v => setSliderParam('ribbonLight','ribbon-light','ribbon-light-val',fmtDeg,v) },
+  ribbonRound: { label:'Ribbon Round',  min:0,    max:1,              apply:v => setSliderParam('ribbonRound','ribbon-round','ribbon-round-val',fmtPct,v) },
+  ribbonGloss: { label:'Ribbon Gloss',  min:0,    max:1,              apply:v => setSliderParam('ribbonGloss','ribbon-gloss','ribbon-gloss-val',fmtPct,v) },
+  ribbonPalette:{ label:'Ribbon Palette', min:0, max:RIBBON_PALETTES.length-1, step:1, apply:v => setRibbonPalette(v) },
+  ribbonOutline:{ label:'Ribbon Outline', toggle:true, apply:b => { params.ribbonOutline = b ? 1 : 0; const cb=document.getElementById('ribbon-outline'); if (cb) cb.checked = b; } },
   shearAmt:  { label:'Shear',         min:-1,   max:1,              apply:v => setSliderParam('shearAmt','shear-amt','shear-amt-val',x=>x.toFixed(2),v) },
   trailAmt:  { label:'Trail',         min:0,    max:0.97,           apply:v => setSliderParam('trailAmt','trail-amt','trail-amt-val',x=>(x<0.01?'off':Math.round(x*100)+'%'),v) },
   mirrorMode:{ label:'Mirror Mode',   min:0,    max:3,   step:1,    apply:v => setMirrorMode(v) },
@@ -4274,6 +4686,8 @@ const MAP_DEFAULTS = {
   crossFm:0, ringAmt:0, fbAmt:0, foldBias:0, crushBits:16, crushRate:0,
   unisonDetune:0, unisonMix:0,
   rotateAngle:0, rotAxis:0, rotSpin:0, fillSurface:0, shearAmt:0, trailAmt:0, mirrorMode:0, fz:0, az:0,
+  ribbon:0, ribbonWidth:0.11, ribbonTwist:2, ribbonLight:135, ribbonRound:0.55,
+  ribbonGloss:0.35, ribbonPalette:0, ribbonOutline:0,
   lfo0Rate:0.5, lfo0Depth:0.5, lfo1Rate:1.0, lfo1Depth:0.5,
   hue:79, sat:84, light:66, lineWidth:1.5, phase:0.5, animSpeed:1, volume:0.5,
   filterCutoff:1, filterQ:0.7, dotsLine:1,
@@ -4756,6 +5170,10 @@ function refreshAllControls() {
   setRotAxis(params.rotAxis ?? 0);
   document.getElementById('rotate-spin').checked = rotSpin;
   document.getElementById('fill-surface').checked = !!params.fillSurface;
+  setRibbonOn(!!params.ribbon);
+  setRibbonPalette(params.ribbonPalette ?? 0);
+  refreshMonoSwatch();
+  document.getElementById('ribbon-outline').checked = !!params.ribbonOutline;
   setS('map-slew', mapSlewTau, 'map-slew-val', fmtSlew);
   applyUnisonAudio();
   document.getElementById('phase-modulators').checked = phaseModulators;
@@ -5001,7 +5419,8 @@ document.addEventListener('dblclick', e => {
 // value within its range by the Deviation amount (1 = fully random).
 const EVOLVE_KEYS = Object.keys(MAP_TARGETS).filter(k => k !== 'preset');
 // Default-excluded: view toggles + master volume (disruptive / non-musical).
-const EVOLVE_DEFAULT_OFF = new Set(['constructionView', 'animatePhase', 'visualSwap', 'volume', 'rotSpin']);
+const EVOLVE_DEFAULT_OFF = new Set(['constructionView', 'animatePhase', 'visualSwap', 'volume', 'rotSpin',
+                                    'ribbon', 'ribbonOutline']);
 const evolveInclude = {};
 EVOLVE_KEYS.forEach(k => { evolveInclude[k] = !EVOLVE_DEFAULT_OFF.has(k); });
 
@@ -5179,7 +5598,8 @@ let _morph = null;
 // is meaningless (ratios would explode the figure's period mid-glide).
 // 'phase' is excluded entirely (never recalled — see applyPresetData) so the
 // running animation stays continuous across a preset change.
-const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'phase']);
+const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'phase',
+                                'ribbon', 'ribbonPalette', 'ribbonOutline']);
 function lerpHex(a, b, u) {
   const pa = a.replace('#',''), pb = b.replace('#','');
   const c = i => Math.round(parseInt(pa.slice(i,i+2),16) + (parseInt(pb.slice(i,i+2),16) - parseInt(pa.slice(i,i+2),16)) * u);
@@ -5316,6 +5736,8 @@ buildPresetGrid();
 highlightActivePreset();
 buildLFOPanels();
 buildEvolveList();
+buildRibbonSwatches();
+setRibbonOn(!!params.ribbon);
 addMapping('fx');   // start with one example mapping row
 updateRecOverlay();
 applyPageBg();
