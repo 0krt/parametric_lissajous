@@ -18,9 +18,20 @@
     --accent: #c8f060;
     --accent2: #60b0f0;
     --text: #d4d4d8;
-    --muted: #52525b;
     --label: #a1a1aa;
     --radius: 4px;
+
+    /* Contrast-checked against the four surfaces this UI actually uses —
+       #0c0c0e (inset), #111115 (sidebar), #15151b (card), #1b1b21 (mod group).
+       --muted was #52525b, which read at 2.2:1 and failed WCAG 1.4.3 badly; the
+       replacement clears 5:1 everywhere. --control-border is the boundary colour
+       for anything you can operate, at ≥3:1 for WCAG 1.4.11. */
+    --muted: #8b8b98;          /* ≥5.10:1 on every surface  */
+    --control-border: #6a6a7b; /* ≥3.23:1 on every surface  */
+    --track: #3f3f4c;
+    --focus: #ffffff;
+    --danger: #ff8a8a;         /* ≥6.4:1; the old #f06060 was borderline */
+    --warn: #f0b060;
   }
 
   body {
@@ -55,7 +66,8 @@
     color: var(--accent);
   }
 
-  header span {
+  /* The subtitle only — `header span` would also catch the icon inside a button. */
+  header > span {
     color: var(--muted);
     font-size: 11px;
     letter-spacing: 0.05em;
@@ -302,20 +314,35 @@
     margin-top: 6px;
   }
 
-  .canvas-area {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    position: relative;
+  /* The drawing surface is the whole browser window, fixed behind the chrome.
+     The figure is still laid out inside .canvas-area — same size, same place —
+     but anything that grows past that box (z depth, rotation, shear, mirrors)
+     now spills into the rest of the window instead of being clipped. */
+  #lissajous-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    z-index: 0;
   }
 
-  #lissajous-canvas {
-    display: block;
-    max-width: 100%;
-    max-height: 100%;
+  /* An empty placeholder: it owns no pixels, it only tells resize() where the
+     figure's square belongs. Its children (frame preview, interval label) ride
+     above the canvas. */
+  .canvas-area {
+    flex: 1;
+    position: relative;
+    z-index: 1;
+    padding: 24px;
+    pointer-events: none;
+    min-width: 0;
   }
+
+  /* Everything that is not the canvas stacks above it and stays opaque, so the
+     controls keep their contrast whatever the figure is doing behind them. */
+  header, .layout, .bottom-bar { position: relative; z-index: 1; }
+  header, .bottom-bar { background: var(--panel); }
 
   .bottom-bar {
     flex-shrink: 0;
@@ -919,7 +946,7 @@
   .grid-mode-row .wave-btn { flex: 1; }
   .grid-meta-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
   .grid-meta-row .map-add-btn { flex: 1; }
-  .grid-hint { font-size: 9px; color: var(--muted); line-height: 1.5; }
+  .grid-hint { font-size: 11px; color: var(--muted); line-height: 1.55; }
   .grid-hint strong { color: var(--accent); }
   .preset-pad-grid {
     flex: 1;
@@ -995,36 +1022,6 @@
   .evolve-list input[type=checkbox] { accent-color: var(--accent2); cursor: pointer; width: 11px; height: 11px; flex-shrink: 0; }
   .evolve-list label:has(input:checked) { color: var(--text); }
 
-  /* Surface palette picker — each swatch previews its own shadow→highlight ramp. */
-  .surface-swatches {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 5px;
-  }
-  .surface-swatch {
-    position: relative;
-    height: 30px;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    cursor: pointer;
-    padding: 0;
-    overflow: hidden;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 8px;
-    letter-spacing: 0.08em;
-    color: rgba(255,255,255,0.82);
-    text-shadow: 0 1px 2px rgba(0,0,0,0.9);
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    padding-bottom: 3px;
-    transition: border-color 0.12s, box-shadow 0.12s;
-  }
-  .surface-swatch:hover { border-color: var(--muted); }
-  .surface-swatch.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-  #surface-controls { transition: opacity 0.15s; }
-  #surface-controls.disabled { opacity: 0.4; pointer-events: none; }
-
   /* ── Phones / narrow screens ──────────────────────────────────────────────
      Below 860px the three-column desk folds into a single column: the figure is
      pinned to the top at a fixed height and the parameter panel underneath
@@ -1040,7 +1037,7 @@
       gap: 10px;
     }
     header h1 { font-size: 12px; }
-    header span { display: none; }        /* subtitle costs a line it can't afford */
+    header > span { display: none; }      /* subtitle costs a line it can't afford */
   }
 
   @media (max-width: 860px) and (orientation: portrait) {
@@ -1173,19 +1170,192 @@
     .grid-hint { display: none; }
     .bottom-bar { padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0px)); }
   }
+
+  /* ══ Readability & WCAG 2.1 AA ═════════════════════════════════════════════
+     Four things this block is responsible for, all of them things the original
+     styling got wrong rather than decoration:
+       1.4.3  text contrast — the 9px --muted helper text was unreadable
+       1.4.4  text is no longer pinned below 10px, and nothing is sized in a way
+              that breaks when the user zooms to 200%
+       1.4.11 every control boundary and state indicator clears 3:1
+       2.4.7  a visible focus ring on everything reachable by keyboard
+       2.1.1  the collapsible section headers are operable without a mouse   */
+
+  /* ── Focus. One ring, everywhere, drawn outside the box so it never shifts
+     layout and never disappears behind a sibling. ─────────────────────────── */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+  /* Keyboard users get the ring; pointer users do not — but a control that is
+     focused AND active still needs to be findable. */
+  input[type=range]:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+  .grid-pad:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+  /* ── Type. Nothing below 10px, and helper prose gets real leading. ──────── */
+  .grid-hint, .vel-label, .lfo-num, .mod-group-label,
+  .lfo-targets label, .map-range, .map-rangecc, .lfo-cc-row,
+  .midi-status-text, .grid-meta-row label { font-size: 10px; }
+  .lfo-wave-btn, .mod-wave-btn, .retrig-btn, .map-cc-btn, .map-cc-num { font-size: 10px; }
+  .evolve-list label { font-size: 11px; }
+  .wave-btn { font-size: 11px; }
+  .grid-pad { font-size: 10px; }
+  .preset-btn { font-size: 11px; padding: 4px 6px; }
+  .param-header label, .checkbox-row label, .color-row label,
+  .number-input label, .midi-ch-row label { font-size: 11.5px; }
+  .status, header > span { font-size: 11.5px; }
+
+  /* ── Control boundaries: 3:1 against whatever they sit on. ──────────────── */
+  .wave-toggle, .midi-select, .midi-ch-select, .map-target, .map-cc-btn,
+  .map-cc-num, .map-range input, .lfo-cc-row input[type=number],
+  .number-input input[type=number], .preset-btn, .grid-pad, .lfo-panel,
+  .btn-outline, .sidebar-toggle, .grid-toggle, .lfo-wave-btn, .mod-wave-btn,
+  .retrig-btn, input[type=color], .ain-meter, .map-add-btn {
+    border-color: var(--control-border);
+  }
+  .map-add-btn { border-style: dashed; }
+  .mod-group, .map-row { border-left-color: var(--control-border); }
+
+  /* ── Sliders. Bigger thumb (easier to hit, easier to see), and a groove with
+     a real edge instead of a near-invisible one. ─────────────────────────── */
+  input[type=range] {
+    height: 6px;
+    background: var(--track);
+    border: 1px solid var(--control-border);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    width: 16px; height: 16px;
+    border: 2px solid #0c0c0e;
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 16px; height: 16px;
+    border: 2px solid #0c0c0e;
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  /* ── Checkboxes: 10px squares are below any reasonable target size. ─────── */
+  .checkbox-row input[type=checkbox],
+  .vel-toggle input[type=checkbox],
+  .lfo-cc-row input[type=checkbox],
+  .lfo-targets input[type=checkbox],
+  .evolve-list input[type=checkbox] { width: 15px; height: 15px; flex-shrink: 0; }
+  .checkbox-row { gap: 9px; margin-bottom: 8px; align-items: flex-start; }
+  .checkbox-row label { line-height: 1.35; }
+
+  /* ── Inactive toggle buttons were --muted on --bg with no border, which read
+     as disabled. Give them the body text colour and a visible edge. ──────── */
+  .wave-btn { color: var(--label); }
+  .wave-btn:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  .lfo-wave-btn, .mod-wave-btn, .retrig-btn, .map-cc-btn, .preset-btn,
+  .map-add-btn, .sidebar-toggle, .grid-toggle { color: var(--label); }
+
+  /* ── Section headers are the app's main navigation and must be operable from
+     the keyboard, announce their state, and look like the buttons they are. ─ */
+  .section-label { font-size: 13.5px; }
+  .section-label:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+  /* ── Collapsible help ───────────────────────────────────────────────────────
+     Every explanatory paragraph in the sidebar is folded behind its own button,
+     so the controls sit close together by default and the prose is one click
+     away rather than permanently in the way. */
+  .info-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: auto;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 8px 0 6px;
+    margin: 6px 0 2px;
+    background: none;
+    border: 1px solid var(--control-border);
+    border-radius: 12px;
+    color: var(--label);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+  }
+  .info-btn:hover { color: var(--accent2); border-color: var(--accent2); }
+  .info-btn[aria-expanded="true"] {
+    color: var(--accent2);
+    border-color: var(--accent2);
+    background: rgba(96,176,240,0.12);
+  }
+  .info-btn .info-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px; height: 14px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    font-size: 9px;
+    font-style: italic;
+    line-height: 1;
+  }
+  .info-text {
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--text);
+    background: rgba(96,176,240,0.06);
+    border-left: 2px solid var(--accent2);
+    border-radius: 0 3px 3px 0;
+    padding: 8px 9px;
+    margin: 2px 0 8px;
+  }
+  .info-text strong { color: var(--accent); font-weight: 500; }
+  .info-text em { color: var(--accent2); font-style: normal; }
+  .info-text[hidden] { display: none; }
+
+  /* ── Status / annotation text that sits on the figure, not on a panel. ──── */
+  #interval-label { font-size: 12px !important; letter-spacing: 0.12em; }
+
+  /* ── Motion. Respect the OS setting for the UI's own transitions; the figure
+     is the content and keeps animating. ──────────────────────────────────── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+    .sidebar, .preset-sidebar { transition: none !important; }
+  }
+
+  /* ── High contrast / forced colours: don't fight the user's palette. ────── */
+  @media (forced-colors: active) {
+    .wave-btn.active, .info-btn[aria-expanded="true"] { forced-color-adjust: none; }
+    :where(a, button, input, select, [tabindex]):focus-visible { outline: 3px solid Highlight; }
+  }
+
+  /* Screen-reader-only text (used for the info buttons' accessible names). */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
 </style>
 </head>
 <body>
 
+<canvas id="lissajous-canvas" width="700" height="700" role="img"
+        aria-label="The Lissajous figure traced by the current X and Y oscillator settings."></canvas>
+
 <header>
-  <button class="sidebar-toggle" id="sidebar-toggle" title="Collapse / expand sidebar">☰</button>
+  <button class="sidebar-toggle" id="sidebar-toggle" type="button" title="Collapse / expand sidebar"
+          aria-label="Collapse or expand the controls sidebar" aria-expanded="true" aria-controls="sidebar-panel"><span aria-hidden="true">☰</span></button>
   <h1>Lissajous</h1>
   <span>parametric figure generator</span>
-  <button class="grid-toggle" id="grid-toggle" title="Show / hide preset grid">PRESETS ▸</button>
+  <button class="grid-toggle" id="grid-toggle" type="button" title="Show / hide preset grid"
+          aria-label="Show or hide the session preset grid" aria-expanded="false" aria-controls="preset-sidebar">PRESETS ▸</button>
 </header>
 
 <div class="layout grid-hidden" id="layout">
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar-panel">
 
     <div class="section" id="section-waveform">
       <div class="section-label">Synthesis</div>
@@ -1311,10 +1481,10 @@
       <div class="mod-group">
         <div class="vel-row"><span class="vel-label">Filter (final stage)</span></div>
         <div class="wave-toggle" style="margin-bottom:8px">
-          <button class="wave-btn active" data-filter="lowpass" style="font-size:9px">LP</button>
-          <button class="wave-btn" data-filter="highpass" style="font-size:9px">HP</button>
-          <button class="wave-btn" data-filter="bandpass" style="font-size:9px">BP</button>
-          <button class="wave-btn" data-filter="notch" style="font-size:9px">NOTCH</button>
+          <button class="wave-btn active" data-filter="lowpass">LP</button>
+          <button class="wave-btn" data-filter="highpass">HP</button>
+          <button class="wave-btn" data-filter="bandpass">BP</button>
+          <button class="wave-btn" data-filter="notch">NOTCH</button>
         </div>
         <div class="param-row">
           <div class="param-header"><label>Cutoff</label><span class="val" id="filter-freq-val">open</span></div>
@@ -1356,7 +1526,7 @@
         <button class="map-add-btn" id="preset-load" style="margin-top:0">⤒ import</button>
       </div>
       <input type="file" id="preset-file" accept="application/json,.json" style="display:none">
-      <div style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.4">
+      <div class="info-text" data-info-label="patch export and import">
         Saves all parameters, LFOs &amp; CC mappings to a .json file.
       </div>
 
@@ -1394,8 +1564,8 @@
 
       <div class="subsection-label">Note Input</div>
       <div class="wave-toggle" style="margin-bottom:8px">
-        <button class="wave-btn active" id="input-manual-btn" style="font-size:9px">MANUAL</button>
-        <button class="wave-btn" id="input-dual-btn" style="font-size:9px">MIDI</button>
+        <button class="wave-btn active" id="input-manual-btn">MANUAL</button>
+        <button class="wave-btn" id="input-dual-btn">MIDI</button>
       </div>
       <div id="x-note-panel" style="display:none">
         <div class="midi-ch-row" style="margin-bottom:5px">
@@ -1428,9 +1598,9 @@
       <div id="octave-mode-panel" style="display:none;margin-top:8px">
         <div style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Octave</div>
         <div class="wave-toggle">
-          <button class="wave-btn active" id="oct-none-btn" style="font-size:9px;padding:5px 3px">NONE</button>
-          <button class="wave-btn" id="oct-full-btn" style="font-size:9px;padding:5px 3px">FULL</button>
-          <button class="wave-btn" id="oct-unison-btn" style="font-size:9px;padding:5px 3px">8VE</button>
+          <button class="wave-btn active" id="oct-none-btn" style="padding:5px 3px">NONE</button>
+          <button class="wave-btn" id="oct-full-btn" style="padding:5px 3px">FULL</button>
+          <button class="wave-btn" id="oct-unison-btn" style="padding:5px 3px">8VE</button>
         </div>
       </div>
       <div id="note-status-panel" style="display:none;margin-top:8px">
@@ -1449,7 +1619,7 @@
         <div class="midi-dot" id="midi-dot"></div>
         <span class="midi-status-text" id="midi-status-text">not connected</span>
       </div>
-      <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Note / main input</div>
+      <div style="font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Note / main input</div>
       <select class="midi-select" id="midi-input-select"><option value="">— no input —</option></select>
       <div style="margin-top:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -1465,7 +1635,7 @@
             <span style="color:var(--label);font-size:11px">Last note</span>
             <span id="midi-note-name" style="color:var(--accent2);font-size:11px">—</span>
           </div>
-          <div style="font-size:9px;color:var(--muted);margin-top:5px;line-height:1.4">
+          <div class="info-text" data-info-label="the MIDI note read-out">
             Follows notes on the X-axis channel set in Note Input.
           </div>
         </div>
@@ -1480,13 +1650,13 @@
 
     <div class="section" id="section-midi-map">
       <div class="section-label">CC Mapping</div>
-      <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Mapping input <span style="text-transform:none">(optional)</span></div>
+      <div style="font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Mapping input <span style="text-transform:none">(optional)</span></div>
       <select class="midi-select" id="midi-map-input-select"><option value="">— same as main —</option></select>
       <div class="param-row" style="margin-top:8px">
         <div class="param-header"><label>Smoothing</label><span class="val" id="map-slew-val">45ms</span></div>
         <input type="range" id="map-slew" min="0" max="1" step="0.005" value="0.045">
       </div>
-      <div style="font-size:9px;color:var(--muted);margin:2px 0 6px;line-height:1.4">
+      <div class="info-text" data-info-label="CC smoothing">
         Interpolates incoming CC values so 7-bit steps don't jitter the parameters.
       </div>
       <div id="map-list"></div>
@@ -1502,16 +1672,16 @@
 
       <div class="subsection-label">Source</div>
       <div class="wave-toggle" style="margin-bottom:8px">
-        <button class="wave-btn active" id="ain-internal-btn" style="font-size:9px">INTERNAL</button>
-        <button class="wave-btn" id="ain-external-btn" style="font-size:9px">EXTERNAL IN</button>
+        <button class="wave-btn active" id="ain-internal-btn">INTERNAL</button>
+        <button class="wave-btn" id="ain-external-btn">EXTERNAL IN</button>
       </div>
 
       <!-- Internal generator controls (hidden when external input is selected) -->
       <div id="ain-internal-controls">
-        <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px">Channel mode</div>
+        <div style="font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px">Channel mode</div>
         <div class="wave-toggle" style="margin-bottom:8px">
-          <button class="wave-btn active" id="audio-stereo-btn" style="font-size:9px">STEREO (X / Y)</button>
-          <button class="wave-btn" id="audio-mono-btn" style="font-size:9px">MONO (X+Y)</button>
+          <button class="wave-btn active" id="audio-stereo-btn">STEREO (X / Y)</button>
+          <button class="wave-btn" id="audio-mono-btn">MONO (X+Y)</button>
         </div>
         <div class="param-row">
           <div class="param-header"><label>Volume</label><span class="val" id="vol-val">50%</span></div>
@@ -1533,10 +1703,10 @@
           <span class="midi-status-text" id="ain-status">internal synth</span>
         </div>
         <div style="display:flex;align-items:center;gap:7px;margin-top:8px">
-          <span style="font-size:9px;letter-spacing:0.08em;color:var(--muted)">IN</span>
+          <span style="font-size:11px;letter-spacing:0.08em;color:var(--muted)">IN</span>
           <div class="ain-meter"><div class="ain-meter-fill" id="ain-meter-fill"></div></div>
         </div>
-        <div style="font-size:9px;color:var(--muted);margin-top:4px" id="ain-diag"></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5" id="ain-diag" role="status"></div>
         <div class="param-row" style="margin-top:8px">
           <div class="param-header"><label>Monitor level</label><span class="val" id="ain-gain-val">100%</span></div>
           <input type="range" id="ain-gain" min="0" max="1" step="0.01" value="1">
@@ -1545,22 +1715,22 @@
           <input type="checkbox" id="ain-monitor" checked>
           <label for="ain-monitor">Monitor (hear through speakers)</label>
         </div>
-        <div style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.5">
+        <div class="info-text" data-info-label="the external audio input">
           External input <strong>replaces</strong> the internal generator (exclusive — no
           mixing) and is captured in video recordings at full level — Volume, Monitor
           level and mute affect only the speakers, never the recording. For
           system/desktop audio pick a loopback device (e.g. BlackHole, Loopback).
         </div>
-        <div id="ain-protocol-note" style="font-size:9px;color:#f0b060;margin-top:6px;line-height:1.5;display:none"></div>
+        <div id="ain-protocol-note" style="font-size:11px;color:var(--warn);margin-top:6px;line-height:1.55;display:none" role="status"></div>
       </div>
 
       <div class="subsection-label">Video</div>
-      <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px">Aspect ratio</div>
+      <div style="font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px">Aspect ratio</div>
       <div class="wave-toggle" style="margin-bottom:8px">
-        <button class="wave-btn active" data-aspect="1:1" style="font-size:9px">1:1</button>
-        <button class="wave-btn" data-aspect="4:5" style="font-size:9px">4:5</button>
-        <button class="wave-btn" data-aspect="16:9" style="font-size:9px">16:9</button>
-        <button class="wave-btn" data-aspect="9:16" style="font-size:9px">9:16</button>
+        <button class="wave-btn active" data-aspect="1:1">1:1</button>
+        <button class="wave-btn" data-aspect="4:5">4:5</button>
+        <button class="wave-btn" data-aspect="16:9">16:9</button>
+        <button class="wave-btn" data-aspect="9:16">9:16</button>
       </div>
       <div class="param-row">
         <div class="param-header"><label>Zoom</label><span class="val" id="rec-zoom-val">1.00×</span></div>
@@ -1570,12 +1740,12 @@
         <input type="checkbox" id="rec-show-frame">
         <label for="rec-show-frame">Show frame preview</label>
       </div>
-      <div style="font-size:9px;color:var(--muted);margin-top:4px;line-height:1.4">
+      <div class="info-text" data-info-label="video recording">
         Recording captures exactly what the canvas shows — construction view included
         when it's on.
       </div>
       <button class="map-add-btn" id="rec-toggle" style="margin-top:8px">● record</button>
-      <div id="rec-status" style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.4"></div>
+      <div id="rec-status" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5" role="status"></div>
     </div>
 
     <div class="section" id="section-render">
@@ -1608,9 +1778,9 @@
       </div>
       <div class="param-header" style="margin-bottom:4px"><label>Rotation axis</label></div>
       <div class="wave-toggle" style="margin-bottom:6px">
-        <button class="wave-btn active" data-rotaxis="0" style="font-size:9px">Z (FLAT)</button>
-        <button class="wave-btn" data-rotaxis="1" style="font-size:9px">Y</button>
-        <button class="wave-btn" data-rotaxis="2" style="font-size:9px">X</button>
+        <button class="wave-btn active" data-rotaxis="0">Z (FLAT)</button>
+        <button class="wave-btn" data-rotaxis="1">Y</button>
+        <button class="wave-btn" data-rotaxis="2">X</button>
       </div>
       <div class="checkbox-row">
         <input type="checkbox" id="rotate-spin">
@@ -1620,16 +1790,31 @@
         <div class="param-header"><label>Shear</label><span class="val" id="shear-amt-val">0.00</span></div>
         <input type="range" id="shear-amt" min="-1" max="1" step="0.01" value="0">
       </div>
-      <div class="param-row">
-        <div class="param-header"><label>Trail</label><span class="val" id="trail-amt-val">off</span></div>
+      <div class="param-header" style="margin-bottom:4px"><label>Trail</label></div>
+      <div class="wave-toggle" style="margin-bottom:6px">
+        <button class="wave-btn active" data-trailmode="0">FADE</button>
+        <button class="wave-btn" data-trailmode="1">KEEP</button>
+      </div>
+      <div class="param-row" id="trail-amt-row">
+        <div class="param-header"><label>Persistence</label><span class="val" id="trail-amt-val">off</span></div>
         <input type="range" id="trail-amt" min="0" max="0.97" step="0.01" value="0">
+      </div>
+      <div id="trail-keep-row" style="display:none">
+        <button class="map-add-btn" id="trail-clear" style="margin-top:0">⌫ clear trail</button>
+      </div>
+      <div class="info-text" data-info-label="trail modes">
+        <strong>FADE</strong> dims each frame by <em>Persistence</em>, a phosphor
+        afterglow that always fades to nothing. <strong>KEEP</strong> never fades:
+        the line writes permanently, and wherever it later crosses something it
+        already drew, that mark is rubbed out again — so the picture builds and
+        erases itself as the figure moves.
       </div>
       <div class="param-header" style="margin-bottom:4px"><label>Mirror</label></div>
       <div class="wave-toggle" style="margin-bottom:8px">
-        <button class="wave-btn active" data-mirror="0" style="font-size:9px">OFF</button>
-        <button class="wave-btn" data-mirror="1" style="font-size:9px">X</button>
-        <button class="wave-btn" data-mirror="2" style="font-size:9px">Y</button>
-        <button class="wave-btn" data-mirror="3" style="font-size:9px">X+Y</button>
+        <button class="wave-btn active" data-mirror="0">OFF</button>
+        <button class="wave-btn" data-mirror="1">X</button>
+        <button class="wave-btn" data-mirror="2">Y</button>
+        <button class="wave-btn" data-mirror="3">X+Y</button>
       </div>
       <div class="checkbox-row">
         <input type="checkbox" id="fill-surface">
@@ -1669,6 +1854,18 @@
         <label for="construction-view">Construction view</label>
       </div>
       <div id="construction-controls" class="mod-group" style="margin-top:6px">
+        <div class="checkbox-row">
+          <input type="checkbox" id="m4-rotate">
+          <label for="m4-rotate">Rotate generators 90&deg; (straight projections)</label>
+        </div>
+        <div class="info-text" data-info-label="rotated generators">
+          Turns each generator wave a quarter turn, so its amplitude is measured
+          along the axis it actually drives, and shows only the single cycle the
+          tracer is inside &mdash; each strip advancing at its own side of the
+          ratio. The two lines from the generators to the moving point are then
+          exactly horizontal and vertical, which is the classic construction.
+          Unchecked, both waves lie along their strip and show the whole lap.
+        </div>
         <div class="param-row">
           <div class="param-header"><label>Trace tempo</label><span class="val" id="trace-speed-val">1.0×</span></div>
           <input type="range" id="trace-speed" min="0" max="5" step="0.1" value="1">
@@ -1686,54 +1883,6 @@
       <button class="btn btn-primary" id="btn-export" style="width:100%;margin-top:12px">Export SVG</button>
     </div>
 
-    <div class="section" id="section-surface">
-      <div class="section-label">Surface</div>
-      <div class="checkbox-row">
-        <input type="checkbox" id="surface-on">
-        <label for="surface-on">Span a membrane on the figure</label>
-      </div>
-      <div id="surface-controls">
-        <div class="param-header" style="margin:10px 0 5px"><label>Palette</label></div>
-        <div class="surface-swatches" id="surface-swatches"></div>
-        <div class="param-row" style="margin-top:10px">
-          <div class="param-header"><label>Tension</label><span class="val" id="surface-tension-val">60%</span></div>
-          <input type="range" id="surface-tension" min="0" max="1" step="0.01" value="0.6">
-        </div>
-        <div class="param-row">
-          <div class="param-header"><label>Lift</label><span class="val" id="surface-lift-val">0.45</span></div>
-          <input type="range" id="surface-lift" min="-1" max="1" step="0.01" value="0.45">
-        </div>
-        <div class="param-row">
-          <div class="param-header"><label>Light</label><span class="val" id="surface-light-val">135&deg;</span></div>
-          <input type="range" id="surface-light" min="0" max="360" step="1" value="135">
-        </div>
-        <div class="param-row">
-          <div class="param-header"><label>Gloss</label><span class="val" id="surface-gloss-val">30%</span></div>
-          <input type="range" id="surface-gloss" min="0" max="1" step="0.01" value="0.3">
-        </div>
-        <div class="param-row">
-          <div class="param-header"><label>Opacity</label><span class="val" id="surface-opacity-val">100%</span></div>
-          <input type="range" id="surface-opacity" min="0.05" max="1" step="0.01" value="1">
-        </div>
-        <div class="param-row">
-          <div class="param-header"><label>Detail</label><span class="val" id="surface-detail-val">35%</span></div>
-          <input type="range" id="surface-detail" min="0" max="1" step="0.01" value="0.35">
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="surface-outline">
-          <label for="surface-outline">Keep rim outline on top</label>
-        </div>
-        <div class="grid-hint" style="margin-top:8px">
-          The film is pinned to the figure and to one point in the middle, then
-          relaxed toward a minimal surface &mdash; <strong>Tension</strong> is how far
-          that runs. A flat figure spans a flat film, which light does nothing to, so
-          <strong>Lift</strong> raises the centre to give it shape; <strong>Z ratio</strong>
-          and <strong>Depth</strong> under Figure bend the rim itself out of the plane.
-          <strong>Detail</strong> is the cost knob &mdash; turn it down if the frame rate drops.
-        </div>
-      </div>
-    </div>
-
     <div class="section" id="section-lfos">
       <div class="section-label">LFOs</div>
       <div id="lfo-list"></div>
@@ -1746,13 +1895,22 @@
         <div class="param-header"><label>Deviation</label><span class="val" id="evolve-dev-val">30%</span></div>
         <input type="range" id="evolve-dev" min="0" max="1" step="0.01" value="0.3">
       </div>
-      <div style="font-size:9px;color:var(--muted);margin:2px 0 10px;line-height:1.4">
+      <div class="info-text" data-info-label="mutation deviation">
         How far each mutation strays from the current value. At 100% every included
         parameter is fully randomised.
       </div>
-      <div style="display:flex;gap:6px;margin-bottom:8px">
+      <div style="display:flex;gap:6px;margin-bottom:6px">
         <button class="map-add-btn" id="evolve-all" style="margin-top:0">select all</button>
         <button class="map-add-btn" id="evolve-none" style="margin-top:0">deselect all</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="map-add-btn" id="evolve-rand3" style="margin-top:0">3 at random</button>
+        <button class="map-add-btn" id="evolve-rand6" style="margin-top:0">6 at random</button>
+      </div>
+      <div class="info-text" data-info-label="the random parameter draw">
+        <strong>3 / 6 at random</strong> clears the list and picks that many
+        parameters at random to include &mdash; a small, legible mutation instead of
+        moving everything at once. The view toggles are left out of the draw.
       </div>
       <div class="evolve-list" id="evolve-list"></div>
       <button class="btn btn-outline" id="evolve-reset" style="width:100%;margin-top:12px">↺ Reset to defaults</button>
@@ -1761,7 +1919,6 @@
   </div>
 
   <div class="canvas-area">
-    <canvas id="lissajous-canvas" width="700" height="700"></canvas>
     <div id="rec-overlay" data-label=""></div>
     <div id="interval-label" style="
       position:absolute;
@@ -1781,11 +1938,11 @@
     <div class="preset-sidebar-head">
       <div class="section-label" style="cursor:default">Session Presets</div>
       <div class="grid-mode-row">
-        <button class="wave-btn active" id="grid-mode-load" style="font-size:9px">LOAD</button>
-        <button class="wave-btn" id="grid-mode-store" style="font-size:9px">STORE</button>
+        <button class="wave-btn active" id="grid-mode-load">LOAD</button>
+        <button class="wave-btn" id="grid-mode-store">STORE</button>
       </div>
       <div class="grid-meta-row">
-        <label style="font-size:9px;letter-spacing:0.08em;color:var(--muted)">MIDI ch</label>
+        <label style="font-size:11px;letter-spacing:0.08em;color:var(--muted)">MIDI ch</label>
         <select class="midi-select" id="grid-channel" style="width:auto;flex:1"></select>
       </div>
       <div class="param-row" style="margin-top:6px">
@@ -1796,7 +1953,7 @@
         <button class="map-add-btn" id="grid-export" style="margin-top:0">⤓ export</button>
         <button class="map-add-btn" id="grid-import" style="margin-top:0">⤒ import</button>
       </div>
-      <div class="grid-hint" id="grid-hint">Pads play from <strong>C1</strong>. STORE-click saves the current patch; right-click clears.</div>
+      <div class="info-text" id="grid-hint" data-info-label="the preset pads">Pads play from <strong>C1</strong>. STORE-click saves the current patch; right-click clears.</div>
       <input type="file" id="grid-file" accept="application/json,.json" style="display:none">
     </div>
     <div class="preset-pad-grid" id="preset-pad-grid"></div>
@@ -1804,7 +1961,7 @@
 </div>
 
 <div class="bottom-bar">
-  <div class="status">
+  <div class="status" role="status" aria-live="off">
     <span>fx</span> <span id="status-fx">3</span> &nbsp;/&nbsp;
     <span>fy</span> <span id="status-fy">2</span> &nbsp;/&nbsp;
     <span>δ</span> <span id="status-phase">0.50π</span>
@@ -1851,22 +2008,15 @@ let params = {
   rotateAngle: 0,  // figure rotation in degrees (visual)
   rotAxis: 0,      // rotation axis: 0 = Z (in-plane), 1 = Y (vertical), 2 = X (horizontal)
   fillSurface: 0,  // 1 = fill the figure's enclosed area (front + back faces)
-  surface: 0,          // 1 = span a lit membrane on the figure's rim (visual)
-  surfaceTension: 0.6, // how far the film relaxes: 0 = flat fan, 1 = taut film
-  surfaceLift: 0.45,   // pushes the pinned centre out of the plane (-1..1)
-  surfaceLight: 135,   // light direction, degrees (135 = upper left)
-  surfaceGloss: 0.3,   // specular highlight strength
-  surfaceOpacity: 1,   // film translucency (0.05..1)
-  surfaceDetail: 0.35, // mesh and raster density — the cost knob
-  surfacePalette: 0,   // index into SURFACE_PALETTES
-  surfaceOutline: 0,   // 1 = keep the stroked rim on top of the film
   shearAmt: 0,     // horizontal shear of the figure (-1..1, visual)
   trailAmt: 0,     // frame persistence 0..0.97 (phosphor-style afterglow, visual)
+  trailMode: 0,    // 0 = FADE (afterglow), 1 = KEEP (permanent, self-erasing)
   mirrorMode: 0,   // 0 = off, 1 = mirror X, 2 = mirror Y, 3 = 4-fold kaleidoscope
   fz: 0,           // z-axis (depth) frequency ratio; 0 = 2D (visual)
   az: 0,           // z-axis depth amount 0..1 — perspective scaling (visual)
   traceSpeed: 1,      // construction view: figure-tracing tempo (independent of phase anim speed)
   untracedAlpha: 0.2, // construction view: opacity of the not-yet-traced background figure
+  m4Rotate: 0,        // construction view: 1 = quarter-turned single-cycle generators
 };
 // Snapshot of starting values (for double-click reset / Reset All / MIDI disconnect)
 const PARAM_DEFAULTS = JSON.parse(JSON.stringify(params));
@@ -2036,7 +2186,7 @@ function modComplexity() {
     + params.crushRate * 0.5;
 }
 
-function drawLissajous(targetCtx, w, h, phase, resolution, zoom) {
+function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
   const { ax, fx, ay, fy, strokeColor, bgColor, lineWidth } = params;
   zoom = zoom || 1;
   // Base resolution from user setting (or override from caller)
@@ -2047,9 +2197,11 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom) {
   resolution = Math.min(Math.max(baseRes, minPts), 160000);
   // Trail persistence: instead of a hard clear, fade the previous frame by painting
   // a semi-transparent background — phosphor-style afterglow.
-  const tA = trailAlpha();
-  targetCtx.fillStyle = tA < 1 ? hexToRgba(bgColor, tA) : bgColor;
-  targetCtx.fillRect(0, 0, w, h);
+  if (!noBg) {
+    const tA = trailAlpha();
+    targetCtx.fillStyle = tA < 1 ? hexToRgba(bgColor, tA) : bgColor;
+    targetCtx.fillRect(0, 0, w, h);
+  }
 
   const cx = w / 2, cy = h / 2;
   const pad = Math.min(w, h) * 0.034;
@@ -2123,25 +2275,6 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom) {
     targetCtx.fillStyle = strokeColor;   // dots mode fills with the stroke colour
   }
 
-  // ── Membrane: the figure as the rim of a spanning surface ───────────────────
-  const surfaceOn = !!params.surface;
-  if (surfaceOn) {
-    const laps = Math.max(1, Math.round(span * gcd(fx, fy) / (Math.PI * 2)));
-    const loop = figureLoopSamples(sxArr, syArr, resolution, laps);
-    const grid = membraneGrid(params.surfaceDetail, Math.min(w, h), mirrors.length);
-    drawMembrane(targetCtx, (u, out) => {
-      const i = Math.min(resolution, Math.round(u * loop));
-      const xs = sxArr[i], ys = syArr[i];
-      out.x = visualSwap ? ys : xs;
-      out.y = visualSwap ? xs : ys;
-      out.z = _xf.z ? Math.sin(zRatio * (i / resolution) * span) : 0;
-    }, { cx, cy, rx, ry, mirrors, w, h, nu: grid.nu, nv: grid.nv });
-    targetCtx.strokeStyle = strokeColor;
-    targetCtx.fillStyle = strokeColor;
-    targetCtx.lineWidth = lineWidth;
-  }
-  // The film replaces the line unless the outline is asked for explicitly.
-  const strokeOn = !surfaceOn || !!params.surfaceOutline;
 
   const dl = params.dotsLine ?? 1;
   // Dots ↔ Line is one continuous morph: the figure is always a stroked path, and
@@ -2149,7 +2282,7 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom) {
   // caps ARE dots, so sparse dots → beads → dashes → solid line with no jump at
   // the top of the slider (the old hard switch from arcs to a line).
   let dashOn = false;
-  if (dl < 0.999 && strokeOn) {
+  if (dl < 0.999) {
     // Coarse path-length estimate so the dash period lands in real pixels.
     let pathLen = 0;
     const S = Math.min(resolution, 1024), [m0x, m0y] = mirrors[0];
@@ -2177,13 +2310,13 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom) {
     }
   };
 
-  if (strokeOn) drawFigure(0);
+  drawFigure(0);
 
   // Unison ghosts — the visual body of the detuned pair: two copies whose X axis
   // leads / lags by ±unisonOffsetCycles() of one X cycle. Separation grows with
   // Detune and precesses over time, the visual analogue of audible beating; Mix
   // alone already separates them slightly, so the doubling shows immediately.
-  if (strokeOn && (params.unisonMix || 0) > 0.01) {
+  if ((params.unisonMix || 0) > 0.01) {
     const k = Math.round(unisonOffsetCycles() * resolution / cyclesX) % resolution;
     if (k > 0) {
       targetCtx.globalAlpha = Math.min(1, params.unisonMix * 0.55);
@@ -2271,37 +2404,90 @@ function figureXform(px, py, zArg, zFlip) {
   _Q.x = px; _Q.y = py;
 }
 
-// Rotation only — no perspective, no shear, no translation. Shading needs the
-// band's surface normal in view space, and a normal must not be projected.
-const _V3 = { x: 0, y: 0, z: 0 };
-function figureRotateVec(vx, vy, vz) {
-  if (_xf.rot) {
-    const c = _xf.c, s = _xf.s;
-    if (_xf.axis === 1)      { const nx = vx * c + vz * s; vz = -vx * s + vz * c; vx = nx; } // Y axis
-    else if (_xf.axis === 2) { const ny = vy * c + vz * s; vz = -vy * s + vz * c; vy = ny; } // X axis
-    else                     { const nx = vx * c - vy * s; vy = vx * s + vy * c; vx = nx; } // Z: in-plane
-  }
-  _V3.x = vx; _V3.y = vy; _V3.z = vz;
-}
-
-// figureXform for a point that carries its own z instead of deriving one from the
-// z oscillator's phase — the membrane's interior is found by relaxation, so its
-// points need real 3D coordinates. Also reports the rotated depth, which is the
-// sort key that makes the sheet occlude itself where it folds through.
-const _Q3 = { x: 0, y: 0, z: 0 };
-function figureXform3(px, py, pz) {
-  figureRotateVec(px, py, pz);
-  let x = _V3.x, y = _V3.y; const z = _V3.z;
-  if (_xf.K > 0.001 && z !== 0) { const pf = 1 / Math.max(0.35, 1 + _xf.K * z); x *= pf; y *= pf; }
-  if (Math.abs(_xf.sh) > 1e-3) x += _xf.sh * y;
-  _Q3.x = x; _Q3.y = y; _Q3.z = z;
-}
-
 // Trail persistence → background alpha. Cubed response so the low/mid slider
 // range is already clearly visible (0.5 → alpha 0.125, long trails).
 function trailAlpha() {
   const t = params.trailAmt || 0;
   return t < 0.01 ? 1 : Math.max(0.01, Math.pow(1 - t, 3));
+}
+
+// ── KEEP trails ──────────────────────────────────────────────────────────────
+// FADE dims the whole window every frame, so a mark always decays. KEEP does the
+// opposite: marks are permanent, and the only thing that removes one is the line
+// crossing it again. That is exactly Porter-Duff XOR — source and destination
+// both survive except where they overlap, where both cancel — so the frame is
+// drawn to a scratch layer and XOR-composited into a persistence buffer, which is
+// then blitted under the chrome.
+//
+// The catch with XOR is a still figure: drawing the identical frame twice would
+// cancel it, and the picture would strobe. So the frame is only folded in when
+// the figure has actually changed, which is what figureSignature() decides.
+let _trailCv = null, _trailCtx = null;     // the persistence buffer
+let _frameCv = null, _frameCtx = null;     // this frame's strokes, alone
+let _trailSig = '';
+
+function trailKeeps() { return Math.round(params.trailMode || 0) === 1; }
+
+function trailLayerReset() {               // called on resize and on demand
+  _trailCv = _trailCtx = _frameCv = _frameCtx = null;
+  _trailSig = '';
+}
+function clearTrail() { trailLayerReset(); }
+
+function _trailLayers() {
+  if (_trailCv && _trailCv.width === canvas.width && _trailCv.height === canvas.height) return;
+  _trailCv = document.createElement('canvas');
+  _trailCv.width = canvas.width; _trailCv.height = canvas.height;
+  _trailCtx = _trailCv.getContext('2d');
+  _frameCv = document.createElement('canvas');
+  _frameCv.width = canvas.width; _frameCv.height = canvas.height;
+  _frameCtx = _frameCv.getContext('2d');
+  _trailSig = '';
+}
+
+// Everything the drawn figure depends on, as a short string. Cheaper and far more
+// reliable than trying to enumerate "is something animating" by hand.
+function figureSignature(phase) {
+  let acc = '';
+  for (const k in params) { const v = params[k]; acc += (typeof v === 'number' ? v.toFixed(4) : v) + ','; }
+  return acc + phase.toFixed(5) + ',' + mode4T.toFixed(5) + ',' + rotSpinPhase.toFixed(3) + ',' +
+         _unisonDrift.toFixed(5) + ',' + waveTypeX + ',' + waveTypeY + ',' + (visualSwap ? 1 : 0) +
+         ',' + (constructionView ? 1 : 0) + ',' + filterType + ',' + (syncHard ? 1 : 0) + ',' + (syncSingle ? 1 : 0);
+}
+
+// Returns the context the frame's figure should be drawn into.
+function beginTrailFrame() {
+  _trailLayers();
+  const dpr = viewDpr;
+  _frameCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  _frameCtx.clearRect(0, 0, viewW, viewH);
+  _frameCtx.imageSmoothingEnabled = true;
+  return _frameCtx;
+}
+
+// Fold the frame into the persistence buffer (only if it moved), then blit.
+function commitTrailFrame(phase) {
+  const sig = figureSignature(phase);
+  if (sig !== _trailSig) {
+    _trailSig = sig;
+    _trailCtx.setTransform(1, 0, 0, 1, 0, 0);
+    _trailCtx.globalCompositeOperation = 'xor';
+    _trailCtx.drawImage(_frameCv, 0, 0);
+    _trailCtx.globalCompositeOperation = 'source-over';
+  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);       // blit in device pixels, 1:1
+  ctx.drawImage(_trailCv, 0, 0);
+  ctx.restore();
+}
+
+// The backdrop under everything, across the whole window. In FADE mode it is a
+// translucent wash (that IS the afterglow); in KEEP mode it must be opaque, since
+// the persistence buffer holds the history instead.
+function paintBackdrop(keep) {
+  const a = keep ? 1 : trailAlpha();
+  ctx.fillStyle = a < 1 ? hexToRgba(params.bgColor, a) : params.bgColor;
+  ctx.fillRect(0, 0, viewW, viewH);
 }
 
 function gcd(a, b) { return b < 0.01 ? a : gcd(b, a % b); }
@@ -2345,320 +2531,18 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-// ── Spanning membrane ────────────────────────────────────────────────────────
-// The figure treated as the rim of a surface rather than as a line: a soap film
-// stretched on the bent wire the curve traces. The film is a disc — its rim runs
-// once round the closed figure, its far edge pinned to a single point in the
-// middle — so wherever the wire crosses itself the film has to pass through
-// itself, and the crossing reads as a fold in the sheet.
-//
-// The shape is not authored. The grid starts as a straight cone from rim to
-// centre, then relaxes: every interior point is repeatedly moved to the average
-// of its four neighbours. That is Laplacian smoothing, which drives the sheet
-// toward a discrete minimal surface — a real soap film, not a drawn one. Tension
-// is how far that relaxation runs, so 0 leaves a flat fan and 1 a taut film. Rim
-// and centre stay pinned throughout; everything between them is found.
-//
-// Quads are shaded from the true surface normal and painted back to front, which
-// is both the occlusion and, when the film is translucent, the correct blend
-// order.
-
-const SURFACE_PALETTES = [
-  // `stops` run shadow → highlight. MONO has none: it is built from the current
-  // stroke colour so the film follows the colour knob like everything else.
-  { id: 'mono',   label: 'MONO'   },
-  { id: 'ice',    label: 'ICE',    stops: ['#04121d', '#0b4570', '#3f93cc', '#a8d8f2', '#f2fbff'] },
-  { id: 'copper', label: 'COPPER', stops: ['#180702', '#5e2510', '#b8642c', '#eda863', '#fff0d2'] },
-  { id: 'magma',  label: 'MAGMA',  stops: ['#0d0413', '#4a1046', '#a52a4a', '#e86b34', '#ffd98d'] },
-  { id: 'jade',   label: 'JADE',   stops: ['#03120e', '#0a4436', '#1d8f6b', '#6fd6a8', '#e2fff2'] },
-  { id: 'violet', label: 'VIOLET', stops: ['#0a0518', '#2e1a63', '#6b46c8', '#a98cf0', '#eee6ff'] },
-  { id: 'steel',  label: 'STEEL',  stops: ['#08090c', '#2b323d', '#6d7887', '#b9c4d2', '#ffffff'] },
-  { id: 'gold',   label: 'GOLD',   stops: ['#140c02', '#553a08', '#a8811a', '#e6c352', '#fff6cf'] },
-  { id: 'ember',  label: 'EMBER',  stops: ['#100205', '#4d0710', '#a81f1c', '#e8752a', '#ffe2a8'] },
-];
-
-const SURF_RAMP_N = 256;
-let _surfRamp = null, _surfRampKey = '';
-
-// Shadow → highlight ramp built from the stroke colour, for the MONO palette.
-function surfaceMonoStops(hex) {
-  const { h, s } = hexToHsl(hex);
-  return [hslToHex(h, Math.min(100, s * 0.9), 5), hslToHex(h, s, 20),
-          hslToHex(h, s, 42), hex, hslToHex(h, Math.min(100, s * 0.45), 93)];
-}
-
-// The ramp as a flat byte table. Shading is interpolated across each triangle
-// and looked up per pixel, so this wants to be an array read, not a string.
-function surfaceRamp() {
-  const pi = Math.max(0, Math.min(SURFACE_PALETTES.length - 1, Math.round(params.surfacePalette || 0)));
-  const key = pi + '|' + params.strokeColor;
-  if (_surfRampKey === key && _surfRamp) return _surfRamp;
-  const pal = SURFACE_PALETTES[pi];
-  const stops = (pal.stops || surfaceMonoStops(params.strokeColor)).map(hx => {
-    const c = hx.replace('#', '');
-    return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
-  });
-  // Packed straight to the pixel format the resolve pass writes. Built by laying
-  // out the bytes and reading them back as a word, so it is correct whichever
-  // way round the machine stores them.
-  const out = new Uint32Array(SURF_RAMP_N);
-  const one = new ArrayBuffer(4), o8 = new Uint8Array(one), o32 = new Uint32Array(one);
-  for (let i = 0; i < SURF_RAMP_N; i++) {
-    const t = (i / (SURF_RAMP_N - 1)) * (stops.length - 1);
-    const a = Math.min(stops.length - 1, Math.floor(t)), b = Math.min(stops.length - 1, a + 1), f = t - a;
-    const A = stops[a], B = stops[b];
-    o8[0] = A[0] + (B[0] - A[0]) * f;
-    o8[1] = A[1] + (B[1] - A[1]) * f;
-    o8[2] = A[2] + (B[2] - A[2]) * f;
-    o8[3] = 255;
-    out[i] = o32[0];
-  }
-  _surfRamp = out; _surfRampKey = key;
-  return out;
-}
-
-// Grid size from the Detail knob, the size the figure is actually drawn at, and
-// the number of mirror copies. Mirrors reuse one relaxed mesh and only cost
-// rasterising, and their copies overlap rather than tiling, so they are charged
-// the square root — dividing by four left a kaleidoscope visibly faceted.
-const MEMB_MAX_QUADS = 9000;
-function membraneGrid(detail, sizePx, mirrorCount) {
-  const d = Math.max(0, Math.min(1, detail));
-  const nv = Math.max(5, Math.round(6 + d * 15));
-  const budget = Math.min(MEMB_MAX_QUADS, (700 + d * 6500) * Math.min(1, sizePx / 560))
-               / Math.sqrt(Math.max(1, mirrorCount));
-  const nu = Math.max(96, Math.min(700, Math.round(budget / nv)));
-  return { nu, nv };
-}
-
-let _mem = null;
-function membraneBuffers(cap) {
-  if (!_mem || _mem.cap < cap) {
-    _mem = { cap,
-      x: new Float64Array(cap), y: new Float64Array(cap), z: new Float64Array(cap),
-      px: new Float64Array(cap), py: new Float64Array(cap), pz: new Float64Array(cap),
-      sh: new Float32Array(cap) };
-  }
-  return _mem;
-}
-
-// ── software rasteriser ──────────────────────────────────────────────────────
-// Painting quads back to front is not good enough for a surface that passes
-// through itself: at a fold the visible boundary is the intersection of two
-// tessellations, and per-quad ordering turns that line into a staircase. A depth
-// buffer resolves it per pixel, and interpolating the shade across each triangle
-// removes the faceting at the same time. Each target canvas keeps its own
-// buffers, so the live view and a video export at another size don't thrash.
-function rasterFor(canvas, rw, rh) {
-  let R = canvas._surfRaster;
-  if (!R || R.rw !== rw || R.rh !== rh) {
-    const cv = document.createElement('canvas');
-    cv.width = rw; cv.height = rh;
-    const ctx = cv.getContext('2d');
-    const img = ctx.createImageData(rw, rh);
-    R = { rw, rh, cv, ctx, img, px: new Uint32Array(img.data.buffer),
-          depth: new Float32Array(rw * rh), shade: new Float32Array(rw * rh) };
-    canvas._surfRaster = R;
-  }
-  return R;
-}
-
-// Depth-tested Gouraud triangle. Barycentric weights are stepped along each
-// scanline rather than recomputed, and the sign of the area is folded into the
-// reciprocal so either winding tests the same way.
-function rasterTri(D, SH, rw, rh, x0, y0, z0, s0, x1, y1, z1, s1, x2, y2, z2, s2) {
-  let minx = Math.max(0, Math.ceil(Math.min(x0, x1, x2) - 0.5));
-  let maxx = Math.min(rw - 1, Math.floor(Math.max(x0, x1, x2) - 0.5));
-  let miny = Math.max(0, Math.ceil(Math.min(y0, y1, y2) - 0.5));
-  let maxy = Math.min(rh - 1, Math.floor(Math.max(y0, y1, y2) - 0.5));
-  if (minx > maxx || miny > maxy) return;
-  const area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
-  if (area === 0 || !isFinite(area)) return;
-  const inv = 1 / area;
-  const d0x = (y1 - y2) * inv, d1x = (y2 - y0) * inv;
-  for (let y = miny; y <= maxy; y++) {
-    const py = y + 0.5, px0 = minx + 0.5;
-    let w0 = ((x1 - px0) * (y2 - py) - (x2 - px0) * (y1 - py)) * inv;
-    let w1 = ((x2 - px0) * (y0 - py) - (x0 - px0) * (y2 - py)) * inv;
-    let i = y * rw + minx;
-    for (let x = minx; x <= maxx; x++, i++, w0 += d0x, w1 += d1x) {
-      if (w0 < 0 || w1 < 0) continue;
-      const w2 = 1 - w0 - w1;
-      if (w2 < 0) continue;
-      const z = w0 * z0 + w1 * z1 + w2 * z2;
-      if (z < D[i]) { D[i] = z; SH[i] = w0 * s0 + w1 * s1 + w2 * s2; }
-    }
-  }
-}
-
-const _RIM = { x: 0, y: 0, z: 0 };
-
-// `rimAt(u, out)` gives the closed rim curve in raw amplitude space for u in
-// [0,1). The film is built, relaxed, shaded and drawn from that alone.
-function drawMembrane(g, rimAt, geo) {
-  const { cx, cy, rx, ry, mirrors } = geo;
-  const nu = geo.nu, nv = geo.nv, S = nv + 1;
-  const cap = nu * S;
-  const B = membraneBuffers(cap);
-  const X = B.x, Y = B.y, Z = B.z;
-  const gloss = params.surfaceGloss ?? 0;
-  const la = ((params.surfaceLight || 0) * Math.PI) / 180;
-  // Canvas y runs down, and −z is toward the viewer, so the light sits in front.
-  let Lx = Math.cos(la), Ly = -Math.sin(la), Lz = -0.8;
-  const Ll = Math.hypot(Lx, Ly, Lz) || 1; Lx /= Ll; Ly /= Ll; Lz /= Ll;
-  const AMB = 0.16;
-
-  // Lambert + specular, as a position in the ramp. Kept as a float: it is
-  // interpolated across each triangle and only quantised at lookup. A film is
-  // two-sided — its back face is lit too, just muted — so a fold reads as a
-  // turn rather than a hole.
-  const shadeIdx = (nx, ny, nz) => {
-    figureRotateVec(nx, ny, nz);
-    let vx = _V3.x, vy = _V3.y, vz = _V3.z;
-    const nl = Math.hypot(vx, vy, vz) || 1; vx /= nl; vy /= nl; vz /= nl;
-    const d = vx * Lx + vy * Ly + vz * Lz;
-    let s = AMB + (1 - AMB) * Math.abs(d) * (vz < 0 ? 1 : 0.55);
-    if (gloss > 0.001) {
-      const rv = Lz - 2 * d * vz;
-      if (rv > 0) s += Math.pow(rv, 20) * gloss * 1.6;
-    }
-    return Math.max(0, Math.min(SURF_RAMP_N - 1, s * (SURF_RAMP_N - 1)));
-  };
-
-  // ── rim, and the point the film is pinned to in the middle ─────────────────
-  let mx0 = 0, my0 = 0, mz0 = 0;
-  for (let i = 0; i < nu; i++) {
-    rimAt(i / nu, _RIM);
-    const a = i * S;
-    X[a] = _RIM.x; Y[a] = _RIM.y; Z[a] = _RIM.z;
-    mx0 += _RIM.x; my0 += _RIM.y; mz0 += _RIM.z;
-  }
-  mx0 /= nu; my0 /= nu; mz0 /= nu;
-  const hubZ = mz0 + (params.surfaceLift || 0) * 0.85;
-
-  // Seed: a straight cone from rim to hub. Rebuilt every frame rather than
-  // carried over, so the film never depends on what the last frame happened to
-  // converge to.
-  for (let i = 0; i < nu; i++) {
-    const a = i * S, x0 = X[a], y0 = Y[a], z0 = Z[a];
-    for (let j = 1; j <= nv; j++) {
-      const f = j / nv;
-      X[a + j] = x0 + (mx0 - x0) * f;
-      Y[a + j] = y0 + (my0 - y0) * f;
-      Z[a + j] = z0 + (hubZ - z0) * f;
-    }
-  }
-
-  // ── relax toward a minimal surface ─────────────────────────────────────────
-  // Gauss-Seidel: each interior point takes the average of its four neighbours,
-  // in place, so information crosses the sheet within a single sweep. j = 0 is
-  // the pinned rim and j = nv the pinned hub, both untouched.
-  const iters = Math.round(Math.max(0, Math.min(1, params.surfaceTension ?? 0)) * 70);
-  for (let it = 0; it < iters; it++) {
-    for (let i = 0; i < nu; i++) {
-      const a = i * S, b = (i === 0 ? nu - 1 : i - 1) * S, c = (i === nu - 1 ? 0 : i + 1) * S;
-      for (let j = 1; j < nv; j++) {
-        X[a + j] = 0.25 * (X[b + j] + X[c + j] + X[a + j - 1] + X[a + j + 1]);
-        Y[a + j] = 0.25 * (Y[b + j] + Y[c + j] + Y[a + j - 1] + Y[a + j + 1]);
-        Z[a + j] = 0.25 * (Z[b + j] + Z[c + j] + Z[a + j - 1] + Z[a + j + 1]);
-      }
-    }
-  }
-
-  // ── project, and shade from the surface normal ─────────────────────────────
-  for (let i = 0; i < nu; i++) {
-    const a = i * S, b = (i === 0 ? nu - 1 : i - 1) * S, c = (i === nu - 1 ? 0 : i + 1) * S;
-    for (let j = 0; j <= nv; j++) {
-      figureXform3(X[a + j], Y[a + j], Z[a + j]);
-      B.px[a + j] = _Q3.x; B.py[a + j] = _Q3.y; B.pz[a + j] = _Q3.z;
-      // Central differences along the grid, one-sided at the rim. The hub is a
-      // single point shared by every i, so its normal is meaningless — it takes
-      // the ring below it instead.
-      const jn = j === nv ? nv - 1 : j;
-      const j1 = jn === 0 ? 0 : jn - 1, j2 = jn === 0 ? 1 : jn + 1;
-      const ux = X[c + jn] - X[b + jn], uy = Y[c + jn] - Y[b + jn], uz = Z[c + jn] - Z[b + jn];
-      const vx = X[a + j2] - X[a + j1], vy = Y[a + j2] - Y[a + j1], vz = Z[a + j2] - Z[a + j1];
-      B.sh[a + j] = shadeIdx(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
-    }
-  }
-
-  // ── rasterise ──────────────────────────────────────────────────────────────
-  // Detail buys raster resolution as well as mesh density. Below the device
-  // resolution the blit upscales, which on a surface made of smooth gradients
-  // costs almost nothing visible; above it, it downsamples and antialiases.
-  const dev = g.canvas.width / Math.max(1, geo.w);
-  const q = 0.42 + 0.58 * Math.max(0, Math.min(1, params.surfaceDetail ?? 0.5));
-  const rw = Math.max(96, Math.min(1600, Math.round(geo.w * dev * q)));
-  const rh = Math.max(96, Math.min(1600, Math.round(geo.h * dev * q)));
-  const R = rasterFor(g.canvas, rw, rh);
-  const D = R.depth, SH = R.shade;
-  D.fill(Infinity);
-  const kx = rw / geo.w, ky = rh / geo.h;
-
-  let bx0 = rw, by0 = rh, bx1 = -1, by1 = -1;
-  for (const [mrx, mry] of mirrors) {
-    for (let i = 0; i < nu; i++) {
-      const a = i * S, c = (i === nu - 1 ? 0 : i + 1) * S;
-      for (let j = 0; j < nv; j++) {
-        const iA = a + j, iB = c + j, iC = c + j + 1, iD = a + j + 1;
-        const xA = (cx + rx * B.px[iA] * mrx) * kx, yA = (cy + ry * B.py[iA] * mry) * ky;
-        const xB = (cx + rx * B.px[iB] * mrx) * kx, yB = (cy + ry * B.py[iB] * mry) * ky;
-        const xC = (cx + rx * B.px[iC] * mrx) * kx, yC = (cy + ry * B.py[iC] * mry) * ky;
-        const xD = (cx + rx * B.px[iD] * mrx) * kx, yD = (cy + ry * B.py[iD] * mry) * ky;
-        rasterTri(D, SH, rw, rh, xA, yA, B.pz[iA], B.sh[iA], xB, yB, B.pz[iB], B.sh[iB], xC, yC, B.pz[iC], B.sh[iC]);
-        rasterTri(D, SH, rw, rh, xA, yA, B.pz[iA], B.sh[iA], xC, yC, B.pz[iC], B.sh[iC], xD, yD, B.pz[iD], B.sh[iD]);
-        const lx = Math.min(xA, xB, xC, xD), hx = Math.max(xA, xB, xC, xD);
-        const ly = Math.min(yA, yB, yC, yD), hy = Math.max(yA, yB, yC, yD);
-        if (lx < bx0) bx0 = lx; if (hx > bx1) bx1 = hx;
-        if (ly < by0) by0 = ly; if (hy > by1) by1 = hy;
-      }
-    }
-  }
-  bx0 = Math.max(0, Math.floor(bx0)); by0 = Math.max(0, Math.floor(by0));
-  bx1 = Math.min(rw - 1, Math.ceil(bx1)); by1 = Math.min(rh - 1, Math.ceil(by1));
-  if (bx1 < bx0 || by1 < by0) return;
-
-  // Resolve depth into colour over the touched rect only — the surrounding
-  // canvas was cleared and never written, so it stays transparent.
-  const ramp = surfaceRamp(), px = R.px;
-  for (let y = by0; y <= by1; y++) {
-    let i = y * rw + bx0;
-    for (let x = bx0; x <= bx1; x++, i++) {
-      if (D[i] === Infinity) { px[i] = 0; continue; }
-      let sIdx = SH[i] | 0;
-      if (sIdx < 0) sIdx = 0; else if (sIdx > 255) sIdx = 255;
-      px[i] = ramp[sIdx];
-    }
-  }
-  R.ctx.clearRect(bx0, by0, bx1 - bx0 + 1, by1 - by0 + 1);
-  R.ctx.putImageData(R.img, 0, 0, bx0, by0, bx1 - bx0 + 1, by1 - by0 + 1);
-
-  const alpha = Math.max(0.05, Math.min(1, params.surfaceOpacity ?? 1));
-  const prevAlpha = g.globalAlpha;
-  if (alpha < 0.999) g.globalAlpha = alpha;
-  g.drawImage(R.cv, 0, 0, rw, rh, 0, 0, geo.w, geo.h);
-  g.globalAlpha = prevAlpha;
-}
-
-// How many samples make up one closed traversal of the figure. The sampled span
-// retraces the curve `laps` times, but only when the waveform is periodic there
-// — modulation can break that, and a rim built from a fraction of an unclosed
-// curve would be missing part of the figure, so fall back to the whole span.
-function figureLoopSamples(ax, ay, resolution, laps) {
-  if (laps <= 1) return resolution;
-  const n = Math.round(resolution / laps);
-  return (Math.abs(ax[0] - ax[n]) < 0.02 && Math.abs(ay[0] - ay[n]) < 0.02) ? n : resolution;
-}
-
 // ── Mode 4 ───────────────────────────────────────────────────────────────────
+const _S = { x: 0, y: 0 };   // scratch point for the construction-view strip mappers
 let mode4T = 0;
 let _m4BufX = new Float64Array(0), _m4BufY = new Float64Array(0);
 
-function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
+function drawMode4(ctx, w, h, phase, noBg) {  // w,h are logical (pre-dpr) pixels
   const { ax, fx, ay, fy, strokeColor, bgColor, lineWidth } = params;
   // phase passed in from render loop (animated)
 
-  const margin = Math.round(Math.min(w, h) * 0.2);
+  // The rotated form needs a deeper strip: its time axis runs across the strip's
+  // short side, and at 20% the single cycle is squashed flat enough to be unreadable.
+  const margin = Math.round(Math.min(w, h) * (params.m4Rotate ? 0.28 : 0.2));
   const pad    = 12;
 
   // Layout: figure bottom-right, X wave along the top strip, Y wave down the left.
@@ -2674,10 +2558,13 @@ function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
 
   const res = Math.min(Math.max(params.resolution, Math.ceil(Math.max(fx, fy) * 96)), 40000);
 
-  // Background (trail-aware, same afterglow behaviour as the main view)
-  const tA4 = trailAlpha();
-  ctx.fillStyle = tA4 < 1 ? hexToRgba(bgColor, tA4) : bgColor;
-  ctx.fillRect(0, 0, w, h);
+  // Background (trail-aware, same afterglow behaviour as the main view). Skipped
+  // when the caller has already painted the backdrop across the whole window.
+  if (!noBg) {
+    const tA4 = trailAlpha();
+    ctx.fillStyle = tA4 < 1 ? hexToRgba(bgColor, tA4) : bgColor;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // Separator lines
   ctx.strokeStyle = 'rgba(255,255,255,0.07)';
@@ -2693,15 +2580,44 @@ function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
   ctx.moveTo(0, margin); ctx.lineTo(w, margin);
   ctx.stroke();
 
-  // Rotated strip mapping: time runs along the LONG axis (figure width / height)
-  // so the waveform isn't squeezed; amplitude runs across the narrow strip.
+  // ── Where the two generator waves are drawn ─────────────────────────────────
+  // NORMAL: time runs along the long axis of each strip and amplitude across the
+  // narrow one, showing the whole fundamental period. The waves read naturally,
+  // but a generator's dot sits at its TIME position, which is not the coordinate
+  // it contributes — so the lines joining the dots to the figure run diagonally.
+  //
+  // ROTATED: each strip is turned a quarter turn, so its amplitude axis is the
+  // very axis it drives — the top wave's amplitude is measured left-to-right (the
+  // figure's x), the left wave's up-and-down (the figure's y). Time then runs
+  // into the depth of the strip. Only one cycle of each generator is shown, the
+  // one the tracer is currently inside, which is why the strips advance at
+  // different rates: the ratio IS how many cycles each fits into a lap. Because
+  // each dot now sits at its own amplitude, the two lines to the figure point are
+  // exactly vertical and exactly horizontal.
+  const m4Rot = !!params.m4Rotate;
   const stripAmp = margin / 2 - 6;
   const xMid = margin / 2;   // vertical centre of the top strip
   const yMid = margin / 2;   // horizontal centre of the left strip
-  const xWaveX = τ   => figX + (τ / T) * figW;                 // top strip: time → x
-  const xWaveY = amp => xMid - amp * stripAmp;                 // top strip: amp → y
-  const yWaveY = τ   => figY + (τ / T) * figH;                 // left strip: time → y
-  const yWaveX = amp => yMid - amp * stripAmp;                 // left strip: amp → x
+  const stripPad = 7;
+  const stripDepth = margin - 2 * stripPad;
+
+  // Cycles each generator fits into one lap, after the X/Y display swap.
+  const gR = gcd(fx, fy);
+  const cycH = Math.max(1, Math.round((visualSwap ? fy : fx) / gR));
+  const cycV = Math.max(1, Math.round((visualSwap ? fx : fy) / gR));
+  const Th = T / cycH, Tv = T / cycV;                    // one cycle of each
+  const hStart = m4Rot ? Math.floor(mode4T / Th) * Th : 0;
+  const vStart = m4Rot ? Math.floor(mode4T / Tv) * Tv : 0;
+  const hSpan  = m4Rot ? Th : T;
+  const vSpan  = m4Rot ? Tv : T;
+
+  // (τ, amplitude) → a point on the strip. The two forms differ only here.
+  const hPt = m4Rot
+    ? (τ, amp) => { _S.x = cx + rx * amp;                           _S.y = stripPad + ((τ - hStart) / Th) * stripDepth; }
+    : (τ, amp) => { _S.x = figX + (τ / T) * figW;                   _S.y = xMid - amp * stripAmp; };
+  const vPt = m4Rot
+    ? (τ, amp) => { _S.x = stripPad + ((τ - vStart) / Tv) * stripDepth; _S.y = cy + ry * amp; }
+    : (τ, amp) => { _S.x = yMid - amp * stripAmp;                   _S.y = figY + (τ / T) * figH; };
 
   // Build filtered per-axis sample arrays over the fundamental period T so the
   // construction view reflects EVERY waveform stage — including the multimode filter,
@@ -2732,29 +2648,26 @@ function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
   const hAt = τ => visualSwap ? ampYArr[idxAt(τ)] : ampXArr[idxAt(τ)];
   const vAt = τ => visualSwap ? ampXArr[idxAt(τ)] : ampYArr[idxAt(τ)];
 
-  // ── Full horizontal wave: top strip (time horizontal, amplitude vertical)
-  ctx.beginPath();
-  for (let i = 0; i <= res; i++) {
-    const τ = (i / res) * T;
-    const amp = hAt(τ);
-    const xp = xWaveX(τ), yp = xWaveY(amp);
-    i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
-  }
-  ctx.strokeStyle = hexToRgba(strokeColor, 0.45);
-  ctx.lineWidth = lineWidth * 0.8;
+  // ── The horizontal generator: top strip
+  const stripRes = Math.min(res, 2048);
+  ctx.strokeStyle = hexToRgba(strokeColor, 0.55);
+  ctx.lineWidth = Math.max(1, lineWidth * 0.8);
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i <= stripRes; i++) {
+    const τ = hStart + (i / stripRes) * hSpan;
+    hPt(τ, hAt(τ));
+    i === 0 ? ctx.moveTo(_S.x, _S.y) : ctx.lineTo(_S.x, _S.y);
+  }
   ctx.stroke();
 
-  // ── Full vertical wave: left strip (time vertical, amplitude horizontal)
+  // ── The vertical generator: left strip
   ctx.beginPath();
-  for (let i = 0; i <= res; i++) {
-    const τ = (i / res) * T;
-    const amp = vAt(τ);
-    const xp = yWaveX(amp), yp = yWaveY(τ);
-    i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
+  for (let i = 0; i <= stripRes; i++) {
+    const τ = vStart + (i / stripRes) * vSpan;
+    vPt(τ, vAt(τ));
+    i === 0 ? ctx.moveTo(_S.x, _S.y) : ctx.lineTo(_S.x, _S.y);
   }
-  ctx.strokeStyle = hexToRgba(strokeColor, 0.45);
-  ctx.lineWidth = lineWidth * 0.8;
   ctx.stroke();
 
   // ── Figure rendering — full visual pipeline (z / rotation axis / shear /
@@ -2786,26 +2699,11 @@ function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
     }
   }
 
-  // Membrane, as in the main view. Here the samplers already walk exactly one
-  // closed lap of the figure (τ over the true period T), so the rim needs no
-  // loop-length correction.
-  const m4Surface = !!params.surface;
-  if (m4Surface) {
-    const grid = membraneGrid(params.surfaceDetail, Math.min(figW, figH), m4Mirrors.length);
-    drawMembrane(ctx, (u, out) => {
-      const τ = u * T;
-      out.x = hAt(τ); out.y = vAt(τ);
-      out.z = _xf.z ? Math.sin(fzr * τ) : 0;
-    }, { cx, cy, rx, ry, mirrors: m4Mirrors, w, h, nu: grid.nu, nv: grid.nv });
-    ctx.lineWidth = lineWidth;
-  }
-  const m4Stroke = !m4Surface || !!params.surfaceOutline;
-
   // Dots ↔ Line applies here too — same continuous dash morph as the main view.
   // Path length is estimated from one traced lap of the figure box.
   const dl4 = params.dotsLine ?? 1;
   let m4Dash = null;
-  if (dl4 < 0.999 && m4Stroke) {
+  if (dl4 < 0.999) {
     let pathLen = 0, lx = 0, ly = 0;
     const S = Math.min(res, 512), [g0x, g0y] = m4Mirrors[0];
     for (let d = 0; d <= S; d++) {
@@ -2821,10 +2719,10 @@ function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
   // Full Lissajous (dim = the untraced part), every mirror image.
   ctx.strokeStyle = hexToRgba(strokeColor, Math.max(0, Math.min(1, params.untracedAlpha)));
   if (!m4Dash) ctx.lineWidth = lineWidth;
-  if (m4Stroke) for (const [mx, my] of m4Mirrors) { m4Path(0, mx, my, false, false); ctx.stroke(); }
+  for (const [mx, my] of m4Mirrors) { m4Path(0, mx, my, false, false); ctx.stroke(); }
 
   // Unison ghosts (± detune copies), dimmer than the untraced figure.
-  if (m4Stroke && (params.unisonMix || 0) > 0.01) {
+  if ((params.unisonMix || 0) > 0.01) {
     const gxy = gcd(fx, fy);
     const τOff = ((unisonOffsetCycles() % 1) * T) / (fx / gxy);   // in X-cycles
     if (τOff > 0.0001) {
@@ -2842,8 +2740,8 @@ function drawMode4(ctx, w, h, phase) {  // w,h are logical (pre-dpr) pixels
   figureXform(xAmpNow, yAmpNow, fzr * t, false);
   const figPx = cx + rx * _Q.x;
   const figPy = cy + ry * _Q.y;
-  const xDotX = xWaveX(t), xDotY = xWaveY(xAmpNow); // dot on top strip
-  const yDotX = yWaveX(yAmpNow), yDotY = yWaveY(t); // dot on left strip
+  hPt(t, xAmpNow); const xDotX = _S.x, xDotY = _S.y;   // dot on the top strip
+  vPt(t, yAmpNow); const yDotX = _S.x, yDotY = _S.y;   // dot on the left strip
 
   // ── Projection lines (dashed): from each strip's moving dot to the figure point
   ctx.setLineDash([3, 5]);
@@ -2901,6 +2799,16 @@ function render(now) {
   const lfodt = Math.min((now - lastDrawAt) / 1000, 0.1); // actual elapsed seconds, clamped
   lastDrawAt = now;
 
+  // Self-heal the bitmap size. A browser can report a degenerate viewport in the
+  // middle of a window resize, and if no further resize event follows, the canvas
+  // would stay the wrong size for the rest of the session.
+  {
+    const d = window.devicePixelRatio || 1;
+    const wantW = Math.round(Math.max(1, Math.floor(window.innerWidth)) * d);
+    const wantH = Math.round(Math.max(1, Math.floor(window.innerHeight)) * d);
+    if (canvas.width !== wantW || canvas.height !== wantH) resize();
+  }
+
   updateDot(now);
   updateInputMeter(now);
 
@@ -2955,7 +2863,6 @@ function render(now) {
     phase = params.phase;
   }
 
-  const logSize = canvas.width / (window.devicePixelRatio || 1);
 
   // Apply smoothed (interpolated) MIDI-CC mappings to base params first, so LFOs
   // modulate on top of the freshly-set base values.
@@ -2975,12 +2882,21 @@ function render(now) {
   pwTick(now);
   tickLFOSliders(now);
 
+  // Backdrop first, across the WHOLE window (this is what makes the trail work
+  // at window scale), then the figure inside its box.
+  const keep = trailKeeps();
+  const drawInto = keep ? beginTrailFrame() : ctx;
+  paintBackdrop(keep);
+  drawInto.save();
+  drawInto.translate(figBox.x, figBox.y);
   if (constructionView) {
     if (animating) animPhase = (animPhase + 0.004 * animSpeed) % 2;
-    drawMode4(ctx, logSize, logSize, animating ? animPhase : params.phase);
+    drawMode4(drawInto, figBox.size, figBox.size, animating ? animPhase : params.phase, true);
   } else {
-    drawLissajous(ctx, logSize, logSize, phase, res, Math.max(0.6, recZoom));
+    drawLissajous(drawInto, figBox.size, figBox.size, phase, res, Math.max(0.6, recZoom), true);
   }
+  drawInto.restore();
+  if (keep) commitTrailFrame(constructionView ? animPhase : phase);
 
   if (recording) captureRecFrame(phase);
 
@@ -3010,8 +2926,9 @@ document.getElementById('stroke-color').addEventListener('input', e => { params.
 // the controls stay readable regardless of the chosen background.
 function applyPageBg() {
   document.body.style.background = params.bgColor;
+  if (typeof updateIntervalLabelContrast === 'function') updateIntervalLabelContrast();
 }
-document.getElementById('bg-color').addEventListener('input', e => { params.bgColor = e.target.value; applyPageBg(); });
+document.getElementById('bg-color').addEventListener('input', e => { params.bgColor = e.target.value; applyPageBg(); clearTrail(); });
 document.getElementById('line-width').addEventListener('input', e => {
   params.lineWidth = parseFloat(e.target.value);
   document.getElementById('line-width-val').textContent = params.lineWidth.toFixed(1);
@@ -3070,7 +2987,9 @@ function updateStatus() {
 
 // SVG export
 document.getElementById('btn-export').addEventListener('click', () => {
-  const w = canvas.width, h = canvas.height;
+  // The canvas bitmap is the whole window now, so the export takes its size from
+  // the figure's own box — the square the figure is actually composed in.
+  const w = Math.round(figBox.size * viewDpr), h = w;
   const { ax, fx, ay, fy, strokeColor, bgColor, lineWidth, resolution } = params;
   const phase = animating ? animPhase : params.phase;
   const cx = w / 2, cy = h / 2;
@@ -3125,21 +3044,39 @@ function resetAll() {
 }
 document.getElementById('btn-reset').addEventListener('click', resetAll);
 
-// Resize canvas to fit container. The padding is read from the element rather
-// than assumed, because the mobile layout uses a much tighter one.
+// The canvas is the whole window; the FIGURE keeps the square it always had.
+// figBox is that square in window coordinates — resize() sizes the bitmap to the
+// viewport and then measures .canvas-area to place the box, so the figure lands
+// exactly where it used to and everything that overflows it is still drawn.
+const figBox = { x: 0, y: 0, size: 700 };
+let viewW = 0, viewH = 0, viewDpr = 1;
+
 function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const W = Math.max(1, Math.floor(window.innerWidth));
+  const H = Math.max(1, Math.floor(window.innerHeight));
+  if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    trailLayerReset();          // the persistence buffer is bitmap-sized
+  }
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  viewW = W; viewH = H; viewDpr = dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // absolute, so repeated calls can't compound
+  ctx.imageSmoothingEnabled = true;
+
+  // Where the figure's square sits, read from the layout placeholder. The padding
+  // is read rather than assumed, because the mobile layout uses a tighter one.
   const area = document.querySelector('.canvas-area');
+  const r = area.getBoundingClientRect();
   const cs = getComputedStyle(area);
   const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
   const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-  const size = Math.max(80, Math.min(area.clientWidth - padX, area.clientHeight - padY, 700));
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = size * dpr;
-  canvas.height = size * dpr;
-  canvas.style.width = size + 'px';
-  canvas.style.height = size + 'px';
-  ctx.scale(dpr, dpr);
-  ctx.imageSmoothingEnabled = true;
+  const size = Math.max(80, Math.min(r.width - padX, r.height - padY, 700));
+  figBox.size = size;
+  figBox.x = r.left + (r.width - size) / 2;
+  figBox.y = r.top + (r.height - size) / 2;
 }
 
 window.addEventListener('resize', resize);
@@ -4095,12 +4032,6 @@ const VISUAL_SLIDERS = [
   ['trail-amt',    'trailAmt',    fmtTrail],
   ['fz',           'fz',          fmtZ],
   ['az',           'az',          v => Math.round(v * 100) + '%'],
-  ['surface-tension', 'surfaceTension', fmtPct],
-  ['surface-lift',    'surfaceLift',    v => v.toFixed(2)],
-  ['surface-light',   'surfaceLight',   fmtDeg],
-  ['surface-gloss',   'surfaceGloss',   fmtPct],
-  ['surface-opacity', 'surfaceOpacity', fmtPct],
-  ['surface-detail',  'surfaceDetail',  fmtPct],
 ];
 VISUAL_SLIDERS.forEach(([id, key, fmt]) => {
   document.getElementById(id).addEventListener('input', e => {
@@ -4120,6 +4051,25 @@ document.querySelectorAll('.wave-btn[data-mirror]').forEach(btn => {
   btn.addEventListener('click', () => setMirrorMode(parseInt(btn.dataset.mirror)));
 });
 
+function setTrailMode(m) {
+  m = Math.max(0, Math.min(1, Math.round(m)));
+  if (m !== params.trailMode) clearTrail();
+  params.trailMode = m;
+  document.querySelectorAll('.wave-btn[data-trailmode]').forEach(b => {
+    const on = parseInt(b.dataset.trailmode) === m;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  const row = document.getElementById('trail-amt-row');
+  const keepRow = document.getElementById('trail-keep-row');
+  if (row) row.style.display = m === 1 ? 'none' : '';
+  if (keepRow) keepRow.style.display = m === 1 ? '' : 'none';
+}
+document.querySelectorAll('.wave-btn[data-trailmode]').forEach(btn => {
+  btn.addEventListener('click', () => setTrailMode(parseInt(btn.dataset.trailmode)));
+});
+document.getElementById('trail-clear').addEventListener('click', clearTrail);
+
 // Rotation axis: Z (in-plane) / Y (vertical) / X (horizontal).
 function setRotAxis(a) {
   a = Math.max(0, Math.min(2, Math.round(a)));
@@ -4132,39 +4082,8 @@ document.querySelectorAll('.wave-btn[data-rotaxis]').forEach(btn => {
 });
 
 document.getElementById('rotate-spin').addEventListener('change', e => { rotSpin = e.target.checked; });
+document.getElementById('m4-rotate').addEventListener('change', e => { params.m4Rotate = e.target.checked ? 1 : 0; });
 document.getElementById('fill-surface').addEventListener('change', e => { params.fillSurface = e.target.checked ? 1 : 0; });
-
-// ── Surface controls ─────────────────────────────────────────────────────────
-function setSurfaceOn(on) {
-  params.surface = on ? 1 : 0;
-  document.getElementById('surface-on').checked = !!on;
-  document.getElementById('surface-controls').classList.toggle('disabled', !on);
-}
-function setSurfacePalette(i) {
-  i = Math.max(0, Math.min(SURFACE_PALETTES.length - 1, Math.round(i)));
-  params.surfacePalette = i;
-  document.querySelectorAll('.surface-swatch').forEach(b =>
-    b.classList.toggle('active', parseInt(b.dataset.pal) === i));
-}
-// MONO previews the stroke colour, so its swatch is rebuilt whenever that changes.
-function buildSurfaceSwatches() {
-  const host = document.getElementById('surface-swatches');
-  host.innerHTML = '';
-  SURFACE_PALETTES.forEach((p, i) => {
-    const stops = p.stops || surfaceMonoStops(params.strokeColor);
-    const b = document.createElement('button');
-    b.className = 'surface-swatch';
-    b.dataset.pal = i;
-    b.title = p.label;
-    b.textContent = p.label;
-    b.style.background = `linear-gradient(105deg, ${stops.join(', ')})`;
-    b.addEventListener('click', () => setSurfacePalette(i));
-    host.appendChild(b);
-  });
-  setSurfacePalette(params.surfacePalette || 0);
-}
-document.getElementById('surface-on').addEventListener('change', e => setSurfaceOn(e.target.checked));
-document.getElementById('surface-outline').addEventListener('change', e => { params.surfaceOutline = e.target.checked ? 1 : 0; });
 
 // Unison: params + push straight onto the live oscillator pair.
 const UNISON_SLIDERS = [
@@ -4674,16 +4593,9 @@ function applyStrokeHSL() {
   params.strokeColor = hex;
   document.getElementById('stroke-color').value = hex;
   updateHSLSliders();
-  refreshMonoSwatch();
-}
-// The MONO ramp is derived from the stroke colour, so its swatch has to follow
-// it. (The ramp itself is rebuilt on demand — see surfaceRamp.)
-function refreshMonoSwatch() {
-  const sw = document.querySelector('.surface-swatch[data-pal="0"]');
-  if (sw) sw.style.background = `linear-gradient(105deg, ${surfaceMonoStops(params.strokeColor).join(', ')})`;
 }
 // Keep HSL state in sync when the colour picker is used manually.
-document.getElementById('stroke-color').addEventListener('input', e => { strokeHSL = hexToHsl(e.target.value); updateHSLSliders(); refreshMonoSwatch(); });
+document.getElementById('stroke-color').addEventListener('input', e => { strokeHSL = hexToHsl(e.target.value); updateHSLSliders(); });
 
 // HSL sliders in the Render section
 ['h','s','l'].forEach(comp => {
@@ -4739,18 +4651,12 @@ const MAP_TARGETS = {
   rotAxis:   { label:'Rotation Axis', min:0,    max:2,   step:1,    apply:v => setRotAxis(v) },
   rotSpin:   { label:'Rotate Spin',   toggle:true, apply:b => { rotSpin = b; const cb=document.getElementById('rotate-spin'); if (cb) cb.checked = b; } },
   fillSurface:{ label:'Fill Surface', toggle:true, apply:b => { params.fillSurface = b ? 1 : 0; const cb=document.getElementById('fill-surface'); if (cb) cb.checked = b; } },
-  surface:       { label:'Surface',         toggle:true, apply:b => setSurfaceOn(b) },
-  surfaceTension:{ label:'Surface Tension', min:0,    max:1,   apply:v => setSliderParam('surfaceTension','surface-tension','surface-tension-val',fmtPct,v) },
-  surfaceLift:   { label:'Surface Lift',    min:-1,   max:1,   apply:v => setSliderParam('surfaceLift','surface-lift','surface-lift-val',x=>x.toFixed(2),v) },
-  surfaceLight:  { label:'Surface Light',   min:0,    max:360, apply:v => setSliderParam('surfaceLight','surface-light','surface-light-val',fmtDeg,v) },
-  surfaceGloss:  { label:'Surface Gloss',   min:0,    max:1,   apply:v => setSliderParam('surfaceGloss','surface-gloss','surface-gloss-val',fmtPct,v) },
-  surfaceOpacity:{ label:'Surface Opacity', min:0.05, max:1,   apply:v => setSliderParam('surfaceOpacity','surface-opacity','surface-opacity-val',fmtPct,v) },
-  surfaceDetail: { label:'Surface Detail',  min:0,    max:1,   apply:v => setSliderParam('surfaceDetail','surface-detail','surface-detail-val',fmtPct,v) },
-  surfacePalette:{ label:'Surface Palette', min:0, max:SURFACE_PALETTES.length-1, step:1, apply:v => setSurfacePalette(v) },
-  surfaceOutline:{ label:'Surface Outline', toggle:true, apply:b => { params.surfaceOutline = b ? 1 : 0; const cb=document.getElementById('surface-outline'); if (cb) cb.checked = b; } },
+
   shearAmt:  { label:'Shear',         min:-1,   max:1,              apply:v => setSliderParam('shearAmt','shear-amt','shear-amt-val',x=>x.toFixed(2),v) },
   trailAmt:  { label:'Trail',         min:0,    max:0.97,           apply:v => setSliderParam('trailAmt','trail-amt','trail-amt-val',x=>(x<0.01?'off':Math.round(x*100)+'%'),v) },
   mirrorMode:{ label:'Mirror Mode',   min:0,    max:3,   step:1,    apply:v => setMirrorMode(v) },
+  m4Rotate:{ label:'Rotate Generators', toggle:true, apply:b => { params.m4Rotate = b ? 1 : 0; const cb=document.getElementById('m4-rotate'); if (cb) cb.checked = b; } },
+  trailMode:{ label:'Trail Mode',     min:0,    max:1,   step:1,    apply:v => setTrailMode(v) },
   fz:        { label:'Z Ratio',       min:0,    max:8,   step:0.5,  apply:v => setSliderParam('fz','fz','fz-val',x=>(x<0.01?'off':(Number.isInteger(x)?x:x.toFixed(1))),v) },
   az:        { label:'Z Depth',       min:0,    max:1,              apply:v => setSliderParam('az','az','az-val',x=>Math.round(x*100)+'%',v) },
   waveX:     { label:'X Wave Cycle',  min:0,    max:3,   step:1,    apply:v => setBaseWave('x', WAVES[Math.max(0,Math.min(3,Math.round(v)))]) },
@@ -4781,9 +4687,7 @@ const MAP_DEFAULTS = {
   syncAmt:1, foldDrive:1, amAmt:0, amRatio:2, noiseAmt:0, waveX:0, waveY:0,
   crossFm:0, ringAmt:0, fbAmt:0, foldBias:0, crushBits:16, crushRate:0,
   unisonDetune:0, unisonMix:0,
-  rotateAngle:0, rotAxis:0, rotSpin:0, fillSurface:0, shearAmt:0, trailAmt:0, mirrorMode:0, fz:0, az:0,
-  surface:0, surfaceTension:0.6, surfaceLift:0.45, surfaceLight:135, surfaceGloss:0.3,
-  surfaceOpacity:1, surfaceDetail:0.35, surfacePalette:0, surfaceOutline:0,
+  rotateAngle:0, rotAxis:0, rotSpin:0, fillSurface:0, shearAmt:0, trailAmt:0, trailMode:0, mirrorMode:0, m4Rotate:0, fz:0, az:0,
   lfo0Rate:0.5, lfo0Depth:0.5, lfo1Rate:1.0, lfo1Depth:0.5,
   hue:79, sat:84, light:66, lineWidth:1.5, phase:0.5, animSpeed:1, volume:0.5,
   filterCutoff:1, filterQ:0.7, dotsLine:1,
@@ -5263,13 +5167,11 @@ function refreshAllControls() {
   VISUAL_SLIDERS.forEach(([id, key, fmt]) => setS(id, params[key] ?? 0, id + '-val', fmt));
   UNISON_SLIDERS.forEach(([id, key, fmt]) => setS(id, params[key] ?? 0, id + '-val', fmt));
   setMirrorMode(params.mirrorMode ?? 0);
+  setTrailMode(params.trailMode ?? 0);
   setRotAxis(params.rotAxis ?? 0);
   document.getElementById('rotate-spin').checked = rotSpin;
+  document.getElementById('m4-rotate').checked = !!params.m4Rotate;
   document.getElementById('fill-surface').checked = !!params.fillSurface;
-  setSurfaceOn(!!params.surface);
-  setSurfacePalette(params.surfacePalette ?? 0);
-  refreshMonoSwatch();
-  document.getElementById('surface-outline').checked = !!params.surfaceOutline;
   setS('map-slew', mapSlewTau, 'map-slew-val', fmtSlew);
   applyUnisonAudio();
   document.getElementById('phase-modulators').checked = phaseModulators;
@@ -5375,8 +5277,15 @@ function recOutDims() {
 function captureRecFrame(phase) {
   if (!fullCtx || !recCtx) return;
   const F = fullCanvas.width;
-  // WYSIWYG: record whichever view the canvas is showing.
-  if (constructionView) {
+  // WYSIWYG: record whichever view the canvas is showing. KEEP trails are the one
+  // thing that cannot be re-rendered — the picture IS the accumulated buffer — so
+  // that mode copies the figure box straight off the live canvas instead.
+  if (trailKeeps()) {
+    const d = viewDpr, s = Math.max(1, Math.round(figBox.size * d));
+    fullCtx.fillStyle = params.bgColor;
+    fullCtx.fillRect(0, 0, F, F);
+    fullCtx.drawImage(canvas, Math.round(figBox.x * d), Math.round(figBox.y * d), s, s, 0, 0, F, F);
+  } else if (constructionView) {
     // Capture the construction view; preserve mode4T so it advances once per frame.
     const saved = mode4T;
     drawMode4(fullCtx, F, F, phase);
@@ -5465,16 +5374,15 @@ function updateRecOverlay() {
   if (!ov) return;
   if (!recShowFrame) { ov.classList.remove('active'); return; }
   const area = document.querySelector('.canvas-area');
-  const cRect = canvas.getBoundingClientRect();
   const aRect = area.getBoundingClientRect();
-  const S = cRect.width;
+  const S = figBox.size;                    // the recorded frame is the figure box
   const [aw, ah] = recAspect, a = aw / ah;
   let fw, fh;
   if (a >= 1) { fw = 1; fh = 1 / a; } else { fh = 1; fw = a; }
   // Zoom scales the figure, not the crop, so the frame box stays fixed.
   const w = fw * S, h = fh * S;
-  ov.style.left = ((cRect.left - aRect.left) + (S - w) / 2) + 'px';
-  ov.style.top  = ((cRect.top - aRect.top) + (cRect.height - h) / 2) + 'px';
+  ov.style.left = ((figBox.x - aRect.left) + (S - w) / 2) + 'px';
+  ov.style.top  = ((figBox.y - aRect.top) + (S - h) / 2) + 'px';
   ov.style.width = w + 'px';
   ov.style.height = h + 'px';
   ov.dataset.label = `${aw}:${ah}  ${Math.max(0.6, recZoom).toFixed(2)}×`;
@@ -5516,7 +5424,7 @@ document.addEventListener('dblclick', e => {
 const EVOLVE_KEYS = Object.keys(MAP_TARGETS).filter(k => k !== 'preset');
 // Default-excluded: view toggles + master volume (disruptive / non-musical).
 const EVOLVE_DEFAULT_OFF = new Set(['constructionView', 'animatePhase', 'visualSwap', 'volume', 'rotSpin',
-                                    'surface', 'surfaceOutline', 'surfaceDetail']);
+                                    'm4Rotate', 'trailMode']);
 const evolveInclude = {};
 EVOLVE_KEYS.forEach(k => { evolveInclude[k] = !EVOLVE_DEFAULT_OFF.has(k); });
 
@@ -5589,6 +5497,7 @@ function buildEvolveList() {
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.checked = evolveInclude[k];
+    cb.dataset.evolveKey = k;
     cb.addEventListener('change', () => { evolveInclude[k] = cb.checked; });
     const span = document.createElement('span');
     span.textContent = MAP_TARGETS[k].label;
@@ -5601,7 +5510,27 @@ function buildEvolveList() {
 
 function setAllEvolve(on) {
   EVOLVE_KEYS.forEach(k => { evolveInclude[k] = on; });
-  document.querySelectorAll('#evolve-list input[type=checkbox]').forEach(cb => { cb.checked = on; });
+  syncEvolveChecks();
+}
+
+function syncEvolveChecks() {
+  document.querySelectorAll('#evolve-list input[type=checkbox]').forEach(cb => {
+    cb.checked = !!evolveInclude[cb.dataset.evolveKey];
+  });
+}
+
+// Include exactly n parameters, chosen at random. The default-off keys (the view
+// toggles and master volume) stay out of the draw — they are excluded because
+// mutating them is disruptive rather than musical, and that is just as true here.
+function selectRandomEvolve(n) {
+  const pool = EVOLVE_KEYS.filter(k => !EVOLVE_DEFAULT_OFF.has(k));
+  for (let i = pool.length - 1; i > 0; i--) {            // Fisher–Yates
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const chosen = new Set(pool.slice(0, Math.min(n, pool.length)));
+  EVOLVE_KEYS.forEach(k => { evolveInclude[k] = chosen.has(k); });
+  syncEvolveChecks();
 }
 
 document.getElementById('evolve-dev').addEventListener('input', e => {
@@ -5612,6 +5541,8 @@ document.getElementById('evolve-mutate').addEventListener('click', () => {
 });
 document.getElementById('evolve-all').addEventListener('click', () => setAllEvolve(true));
 document.getElementById('evolve-none').addEventListener('click', () => setAllEvolve(false));
+document.getElementById('evolve-rand3').addEventListener('click', () => selectRandomEvolve(3));
+document.getElementById('evolve-rand6').addEventListener('click', () => selectRandomEvolve(6));
 document.getElementById('evolve-reset').addEventListener('click', evolveReset);
 
 // ─── SESSION PRESET GRID (right sidebar) ──────────────────────────────────────
@@ -5621,7 +5552,7 @@ document.getElementById('evolve-reset').addEventListener('click', evolveReset);
 // colour is the stored patch's line colour.
 const GRID_PADS = 64;           // 4 columns × 16 rows
 const GRID_BASE_NOTE = 24;      // C1 (note 24, with C-1 = 0)
-let gridChannel = 1;            // MIDI channel (1–16) the whole grid listens on
+let gridChannel = 8;            // MIDI channel (1–16) the whole grid listens on
 let gridStoreMode = false;      // false = click loads a pad, true = click stores into it
 let gridPresets = new Array(GRID_PADS).fill(null);
 let gridActiveIdx = -1;
@@ -5694,8 +5625,7 @@ let _morph = null;
 // is meaningless (ratios would explode the figure's period mid-glide).
 // 'phase' is excluded entirely (never recalled — see applyPresetData) so the
 // running animation stays continuous across a preset change.
-const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'phase',
-                                'surface', 'surfacePalette', 'surfaceOutline']);
+const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'trailMode', 'm4Rotate', 'phase']);
 function lerpHex(a, b, u) {
   const pa = a.replace('#',''), pb = b.replace('#','');
   const c = i => Math.round(parseInt(pa.slice(i,i+2),16) + (parseInt(pb.slice(i,i+2),16) - parseInt(pa.slice(i,i+2),16)) * u);
@@ -5769,7 +5699,7 @@ document.getElementById('grid-mode-store').addEventListener('click', () => setGr
     o.value = c; o.textContent = c; sel.appendChild(o);
   }
   sel.value = gridChannel;
-  sel.addEventListener('change', e => { gridChannel = parseInt(e.target.value) || 1; });
+  sel.addEventListener('change', e => { gridChannel = parseInt(e.target.value) || 8; });
 })();
 
 // Morph time slider.
@@ -5832,8 +5762,6 @@ buildPresetGrid();
 highlightActivePreset();
 buildLFOPanels();
 buildEvolveList();
-buildSurfaceSwatches();
-setSurfaceOn(!!params.surface);
 addMapping('fx');   // start with one example mapping row
 updateRecOverlay();
 applyPageBg();
@@ -5855,6 +5783,180 @@ document.querySelectorAll('.section').forEach(s => {
 
 requestAnimationFrame(render);
 updateIntervalLabel();
+
+
+// ═══ ACCESSIBILITY & HELP ══════════════════════════════════════════════════════
+// Three passes over the finished DOM. Doing it here rather than by hand in the
+// markup is deliberate: the sidebar holds ~80 controls built from repeating
+// patterns, and a pass that derives the relationships from those patterns cannot
+// drift out of sync with them the way 80 hand-written `for=` attributes would.
+
+// ── 1. Every explanatory paragraph folds behind its own button ────────────────
+// The prose is worth keeping — it explains things the controls cannot — but it
+// pushed the controls apart and had to be scrolled past on every visit. Hidden by
+// default, one button each, state announced.
+function initInfoToggles() {
+  let n = 0;
+  document.querySelectorAll('.info-text').forEach(body => {
+    if (body.dataset.infoWired) return;
+    body.dataset.infoWired = '1';
+    const id = body.id || ('info-body-' + (++n));
+    body.id = id;
+    body.hidden = true;
+
+    // Name the button after whatever it explains, so a screen-reader user hears
+    // "About Trail", not the twelfth identical "more info".
+    let topic = body.dataset.infoLabel || '';
+    if (!topic) {
+      let p = body.previousElementSibling;
+      while (p && !topic) {
+        const t = p.querySelector ? (p.querySelector('label, .vel-label, .subsection-label') || p) : p;
+        const txt = (t.textContent || '').trim().split('\n')[0];
+        if (txt && txt.length < 40) topic = txt;
+        p = p.previousElementSibling;
+      }
+    }
+    if (!topic) {
+      const sec = body.closest('.section');
+      const lbl = sec && sec.querySelector('.section-label');
+      topic = lbl ? lbl.textContent.trim() : 'this control';
+    }
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'info-btn';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', id);
+    btn.innerHTML = '<span class="info-mark" aria-hidden="true">i</span><span aria-hidden="true">info</span>';
+    const sr = document.createElement('span');
+    sr.className = 'sr-only';
+    sr.textContent = 'About ' + topic;
+    btn.appendChild(sr);
+    btn.title = 'About ' + topic;
+    btn.addEventListener('click', () => {
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      body.hidden = open;
+    });
+    body.parentNode.insertBefore(btn, body);
+  });
+}
+
+// ── 2. Name every control ─────────────────────────────────────────────────────
+// The sliders carry their label in a sibling <label> with no `for`, which is
+// decoration to a screen reader. Walk each row, bind the two together, and point
+// the control at its live value read-out as a description.
+function initControlLabels() {
+  const ROWS = '.param-row, .color-row, .number-input, .midi-ch-row, .lfo-cc-row, .grid-meta-row';
+  let n = 0;
+  document.querySelectorAll(ROWS).forEach(row => {
+    const ctl = row.querySelector('input:not([type=checkbox]), select, textarea');
+    if (!ctl) return;
+    if (!ctl.id) ctl.id = 'ctl-auto-' + (++n);
+    const lbl = row.querySelector('label');
+    if (lbl && !lbl.htmlFor && !lbl.contains(ctl)) lbl.htmlFor = ctl.id;
+    const val = row.querySelector('.val');
+    if (val && !ctl.getAttribute('aria-describedby')) {
+      if (!val.id) val.id = ctl.id + '-readout';
+      ctl.setAttribute('aria-describedby', val.id);
+    }
+  });
+
+  // A `.param-header` immediately followed by a button group is that group's
+  // label ("Rotation axis", "Mirror", "Mod shape", "Trail" …).
+  document.querySelectorAll('.wave-toggle, .lfo-wave-toggle').forEach(group => {
+    if (group.getAttribute('aria-label') || group.getAttribute('role')) return;
+    let p = group.previousElementSibling, name = '';
+    while (p && !name) {
+      if (p.classList && (p.classList.contains('param-header') || p.classList.contains('vel-row'))) {
+        name = (p.textContent || '').trim();
+      }
+      p = p.previousElementSibling;
+      if (name || (p && p.classList && p.classList.contains('param-row'))) break;
+    }
+    group.setAttribute('role', 'group');
+    if (name) group.setAttribute('aria-label', name);
+  });
+
+  // Toggle buttons are toggles: say so, and keep it true as they are clicked.
+  const syncPressed = root => {
+    root.querySelectorAll('.wave-btn, .lfo-wave-btn, .mod-wave-btn, .retrig-btn').forEach(b => {
+      if (!b.type) b.type = 'button';
+      b.setAttribute('aria-pressed', b.classList.contains('active') ? 'true' : 'false');
+    });
+  };
+  syncPressed(document);
+  // The app toggles `.active` from a dozen places; observing the class is more
+  // dependable than trying to hook every one of them.
+  if (window.MutationObserver) {
+    new MutationObserver(muts => {
+      muts.forEach(m => {
+        const b = m.target;
+        if (b.matches && b.matches('.wave-btn, .lfo-wave-btn, .mod-wave-btn, .retrig-btn')) {
+          b.setAttribute('aria-pressed', b.classList.contains('active') ? 'true' : 'false');
+        }
+      });
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  }
+
+  // Bare <button> elements default to type=submit; harmless here, but explicit
+  // is better and it stops Enter doing anything unexpected.
+  document.querySelectorAll('button:not([type])').forEach(b => { b.type = 'button'; });
+}
+
+// ── 3. Section headers: operable, and honest about their state ────────────────
+function initSectionHeaders() {
+  document.querySelectorAll('.section > .section-label').forEach((label, i) => {
+    const sec = label.parentElement;
+    if (label.getAttribute('role') === 'button') return;
+    if (getComputedStyle(label).cursor === 'default') return;   // the fixed one
+    label.setAttribute('role', 'button');
+    label.tabIndex = 0;
+    const bodyId = sec.id ? sec.id + '-body' : 'section-body-' + i;
+    sec.setAttribute('aria-labelledby', label.id || (label.id = bodyId + '-label'));
+    const setState = () => label.setAttribute('aria-expanded', sec.classList.contains('collapsed') ? 'false' : 'true');
+    setState();
+    label.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); label.click(); }
+    });
+    label.addEventListener('click', () => setTimeout(setState, 0));
+  });
+}
+
+// ── 4. The one piece of text drawn ON the figure ──────────────────────────────
+// It used to be a fixed 35%-white, which vanished on a light background. Pick
+// black or white from the background's own luminance instead.
+function updateIntervalLabelContrast() {
+  const el = document.getElementById('interval-label');
+  if (!el) return;
+  const h = (params.bgColor || '#0c0c0e').replace('#', '');
+  const ch = [0, 2, 4].map(i => {
+    const c = parseInt(h.slice(i, i + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  const lum = 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  el.style.color = lum > 0.18 ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.82)';
+}
+
+// The sidebar / preset-grid toggles report their state.
+function initPanelToggleState() {
+  const layout = document.getElementById('layout');
+  const sb = document.getElementById('sidebar-toggle');
+  const gt = document.getElementById('grid-toggle');
+  const sync = () => {
+    if (sb) sb.setAttribute('aria-expanded', layout.classList.contains('sidebar-hidden') ? 'false' : 'true');
+    if (gt) gt.setAttribute('aria-expanded', layout.classList.contains('grid-hidden') ? 'false' : 'true');
+  };
+  sync();
+  if (sb) sb.addEventListener('click', () => setTimeout(sync, 0));
+  if (gt) gt.addEventListener('click', () => setTimeout(sync, 0));
+}
+
+initInfoToggles();
+initControlLabels();
+initSectionHeaders();
+initPanelToggleState();
+updateIntervalLabelContrast();
 
 </script>
 </body>
