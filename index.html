@@ -1661,6 +1661,46 @@
       </div>
       <div id="map-list"></div>
       <button class="map-add-btn" id="map-add">+ add CC mapping</button>
+
+      <div class="subsection-label">Wave Out</div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="wo-on">
+        <label for="wo-on">Send X &amp; Y as MIDI CC</label>
+      </div>
+      <div id="wo-controls">
+        <div style="font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Output</div>
+        <select class="midi-select" id="wo-port"><option value="">— no MIDI output —</option></select>
+        <div class="midi-ch-row">
+          <label for="wo-ch">Channel</label>
+          <select class="midi-ch-select" id="wo-ch"></select>
+        </div>
+        <div class="midi-ch-row">
+          <label for="wo-cc-x">X axis CC</label>
+          <input type="number" class="map-cc-num" id="wo-cc-x" min="0" max="119" step="1" value="16">
+        </div>
+        <div class="midi-ch-row">
+          <label for="wo-cc-y">Y axis CC</label>
+          <input type="number" class="map-cc-num" id="wo-cc-y" min="0" max="119" step="1" value="17">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Rate</label><span class="val" id="wo-rate-val">1.00 laps/s</span></div>
+          <input type="range" id="wo-rate" min="0.01" max="20" step="0.01" value="1">
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="wo-follow" checked>
+          <label for="wo-follow">Follow the construction tracer when it's showing</label>
+        </div>
+        <div class="grid-hint" id="wo-status">X — · Y —</div>
+      </div>
+      <div class="info-text" data-info-label="the wave outputs">
+        Streams the two axis waveforms out as continuous controllers, so the same
+        shapes that draw the figure can modulate something in a DAW. The rate is
+        the <strong>visual</strong> one, not the audible one: <em>Rate</em> sets how
+        many laps of the figure go by per second, and each axis then runs at its own
+        side of the ratio — a 3:2 figure at 1 lap/s sends 3&nbsp;Hz on X and 2&nbsp;Hz
+        on Y. The values carry the whole waveform chain, filter included, and are
+        sent only when the 7-bit value actually changes.
+      </div>
     </div>
 
     <div class="section" id="section-audio">
@@ -1800,14 +1840,24 @@
         <input type="range" id="trail-amt" min="0" max="0.97" step="0.01" value="0">
       </div>
       <div id="trail-keep-row" style="display:none">
-        <button class="map-add-btn" id="trail-clear" style="margin-top:0">⌫ clear trail</button>
+        <div class="param-row">
+          <div class="param-header"><label>Count</label><span class="val" id="trail-count-val">4</span></div>
+          <input type="range" id="trail-count" min="0" max="16" step="1" value="4">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Spacing</label><span class="val" id="trail-spacing-val">0.08π</span></div>
+          <input type="range" id="trail-spacing" min="0.005" max="0.5" step="0.005" value="0.08">
+        </div>
       </div>
       <div class="info-text" data-info-label="trail modes">
-        <strong>FADE</strong> dims each frame by <em>Persistence</em>, a phosphor
-        afterglow that always fades to nothing. <strong>KEEP</strong> never fades:
-        the line writes permanently, and wherever it later crosses something it
-        already drew, that mark is rubbed out again — so the picture builds and
-        erases itself as the figure moves.
+        <strong>FADE</strong> is an afterglow: each frame's curve is kept and eaten
+        away over the next few, at a rate set by <em>Persistence</em>.
+        <strong>KEEP</strong> does not fade at all — it draws <em>Count</em> extra
+        copies of the figure, each <em>Spacing</em> further back in phase, so the
+        trail is a set of standing copies rather than a smear. The live curve
+        erases whatever it crosses, so it always reads solid and the copies give
+        way to it. Either way the trail applies to the figure alone; the
+        construction view's strips, rulers and dots are redrawn clean every frame.
       </div>
       <div class="param-header" style="margin-bottom:4px"><label>Mirror</label></div>
       <div class="wave-toggle" style="margin-bottom:8px">
@@ -1854,17 +1904,20 @@
         <label for="construction-view">Construction view</label>
       </div>
       <div id="construction-controls" class="mod-group" style="margin-top:6px">
-        <div class="checkbox-row">
-          <input type="checkbox" id="m4-rotate">
-          <label for="m4-rotate">Rotate generators 90&deg; (straight projections)</label>
+        <div class="param-header" style="margin-bottom:4px"><label>Generators</label></div>
+        <div class="wave-toggle" style="margin-bottom:6px">
+          <button class="wave-btn active" data-m4rot="1">STRAIGHT</button>
+          <button class="wave-btn" data-m4rot="0">FULL LAP</button>
         </div>
-        <div class="info-text" data-info-label="rotated generators">
-          Turns each generator wave a quarter turn, so its amplitude is measured
-          along the axis it actually drives, and shows only the single cycle the
-          tracer is inside &mdash; each strip advancing at its own side of the
-          ratio. The two lines from the generators to the moving point are then
-          exactly horizontal and vertical, which is the classic construction.
-          Unchecked, both waves lie along their strip and show the whole lap.
+        <div class="info-text" data-info-label="the generator strips">
+          <strong>STRAIGHT</strong> turns each generator a quarter turn, so its
+          amplitude is measured along the axis it drives, and scrolls a
+          one-cycle window that always ends at the tracer. The tracer's dot
+          therefore holds a fixed depth and moves only sideways while the wave
+          slides past, and the two lines to the moving point stay exactly
+          horizontal and vertical &mdash; the classic construction.
+          <strong>FULL LAP</strong> lays each wave along its strip and shows the
+          whole lap at once, at the cost of diagonal projections.
         </div>
         <div class="param-row">
           <div class="param-header"><label>Trace tempo</label><span class="val" id="trace-speed-val">1.0×</span></div>
@@ -2010,13 +2063,15 @@ let params = {
   fillSurface: 0,  // 1 = fill the figure's enclosed area (front + back faces)
   shearAmt: 0,     // horizontal shear of the figure (-1..1, visual)
   trailAmt: 0,     // frame persistence 0..0.97 (phosphor-style afterglow, visual)
-  trailMode: 0,    // 0 = FADE (afterglow), 1 = KEEP (permanent, self-erasing)
+  trailMode: 0,    // 0 = FADE (afterglow), 1 = KEEP (discrete phase-offset copies)
+  trailCount: 4,   // KEEP: how many copies of the figure trail behind it
+  trailSpacing: 0.08, // KEEP: phase distance between copies, in π
   mirrorMode: 0,   // 0 = off, 1 = mirror X, 2 = mirror Y, 3 = 4-fold kaleidoscope
   fz: 0,           // z-axis (depth) frequency ratio; 0 = 2D (visual)
   az: 0,           // z-axis depth amount 0..1 — perspective scaling (visual)
   traceSpeed: 1,      // construction view: figure-tracing tempo (independent of phase anim speed)
   untracedAlpha: 0.2, // construction view: opacity of the not-yet-traced background figure
-  m4Rotate: 0,        // construction view: 1 = quarter-turned single-cycle generators
+  m4Rotate: 1,        // construction view: 1 = quarter-turned scrolling generators (default)
 };
 // Snapshot of starting values (for double-click reset / Reset All / MIDI disconnect)
 const PARAM_DEFAULTS = JSON.parse(JSON.stringify(params));
@@ -2214,21 +2269,26 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
   if (_figBufX.length < N) { _figBufX = new Float64Array(N); _figBufY = new Float64Array(N); }
   const sxArr = _figBufX, syArr = _figBufY;
   const span = Math.PI * 2 * lcm(fx, fy) / Math.min(fx, fy);
-  for (let i = 0; i <= resolution; i++) {
-    const t = (i / resolution) * span;
-    sxArr[i] = processWave(fx * t + phase * Math.PI, fx * t, waveTypeX, 'x');
-    syArr[i] = processWave(fy * t, fy * t, waveTypeY, 'y');
+  // Memo on (phase, resolution), reset once per frame by render(). KEEP trails
+  // stroke each copy twice — once to clear what is under it, once to draw it —
+  // and both passes want the same samples, so this halves the sampling work.
+  if (_figMemoPhase !== phase || _figMemoRes !== resolution) {
+    _figMemoPhase = phase; _figMemoRes = resolution;
+    for (let i = 0; i <= resolution; i++) {
+      const t = (i / resolution) * span;
+      sxArr[i] = processWave(fx * t + phase * Math.PI, fx * t, waveTypeX, 'x');
+      syArr[i] = processWave(fy * t, fy * t, waveTypeY, 'y');
+    }
+    // ── Multimode filter + comb (final waveform stages) ────────────────────────
+    if (filterIsOn()) {
+      const HC = filterHarmonics();
+      const wX = Math.PI * 2 * Math.min(0.49, (HC * fx * periodFactor) / resolution);
+      const wY = Math.PI * 2 * Math.min(0.49, (HC * fy * periodFactor) / resolution);
+      filterPeriodic(sxArr, N, biquadCoeffs(filterType, wX, params.filterQ));
+      filterPeriodic(syArr, N, biquadCoeffs(filterType, wY, params.filterQ));
+    }
   }
-
-  // ── Multimode filter + comb (final waveform stages) ──────────────────────────
   const cyclesX = fx * periodFactor, cyclesY = fy * periodFactor;
-  if (filterIsOn()) {
-    const HC = filterHarmonics();
-    const wX = Math.PI * 2 * Math.min(0.49, (HC * cyclesX) / resolution);
-    const wY = Math.PI * 2 * Math.min(0.49, (HC * cyclesY) / resolution);
-    filterPeriodic(sxArr, N, biquadCoeffs(filterType, wX, params.filterQ));
-    filterPeriodic(syArr, N, biquadCoeffs(filterType, wY, params.filterQ));
-  }
 
   targetCtx.strokeStyle = strokeColor;
   targetCtx.fillStyle = strokeColor;
@@ -2281,23 +2341,9 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
   // the slider drives a round-capped dash pattern. Zero-length dashes with round
   // caps ARE dots, so sparse dots → beads → dashes → solid line with no jump at
   // the top of the slider (the old hard switch from arcs to a line).
-  let dashOn = false;
-  if (dl < 0.999) {
-    // Coarse path-length estimate so the dash period lands in real pixels.
-    let pathLen = 0;
-    const S = Math.min(resolution, 1024), [m0x, m0y] = mirrors[0];
-    let lx = 0, ly = 0;
-    for (let d = 0; d <= S; d++) {
-      pt(Math.round((d / S) * resolution), 0, m0x, m0y, false);
-      if (d) pathLen += Math.hypot(_P.x - lx, _P.y - ly);
-      lx = _P.x; ly = _P.y;
-    }
-    // The sampled span retraces the closed figure `laps` times (span ÷ the true
-    // fundamental period). Spacing the dashes over the whole span would alias —
-    // every lap lands on the same points — so space them over ONE lap instead.
-    const laps = Math.max(1, Math.round(span * gcd(fx, fy) / (Math.PI * 2)));
-    dashOn = !!applyDotDash(targetCtx, dl, lineWidth, pathLen / laps);
-  }
+  // Fixed pixel spacing needs no path-length estimate — and dropping it also
+  // drops a 1024-point pre-pass per frame.
+  const dashOn = !!applyDotDash(targetCtx, dl, lineWidth);
 
   const drawFigure = (k) => {
     for (const [mx, my] of mirrors) {
@@ -2336,6 +2382,7 @@ const MIRROR_SETS = [
 ];
 function figureMirrors() { return MIRROR_SETS[Math.max(0, Math.min(3, Math.round(params.mirrorMode || 0)))]; }
 const _P = { x: 0, y: 0 };      // scratch point for drawLissajous
+let _figMemoPhase = NaN, _figMemoRes = -1;   // per-frame sample memo (see drawLissajous)
 let _unisonDrift = 0;           // unison ghost precession (cycles); advanced in render()
 // How far the unison ghosts sit from the main figure, in cycles. A small baseline
 // makes the doubling visible from Mix alone; Detune widens the separation and (via
@@ -2345,21 +2392,35 @@ function unisonOffsetCycles() {
   return (0.015 + 0.2 * (det / 50) + _unisonDrift) % 1;
 }
 
-// Dash pattern for the Dots ↔ Line morph, shared by both views. Applies the dash
-// + width to the context and returns the dash array (so callers can re-apply it
-// after drawing something with its own dash), or null when the figure is solid.
-function applyDotDash(c, dl, lineWidth, pathLen) {
+// The Dots ↔ Line control, shared by both views.
+//
+// The slider sets the GAP BETWEEN DOTS, in pixels — not how many dots there are.
+// That distinction is the whole point: a dash period derived from `pathLen /
+// dotCount` keeps the count fixed, so any change that lengthens the drawn line
+// (AM depth, fold, a higher ratio, a mirror) stretches the same dots further
+// apart and the texture drifts. Spacing the dash in absolute pixels instead
+// means a longer line simply carries more dots at the same pitch, and the
+// stipple stays put while the figure moves underneath it.
+//
+// The dot itself stays a dot: a round cap on a near-zero dash, at the stroke
+// width, never a lengthening segment.
+function dotSpacingPx(dl, lineWidth) {
+  // dl 0 → widest gap, dl → 1 → dots touching (and ≥0.999 is a solid line).
+  // Geometric, so the sparse end has usable resolution.
+  const near = Math.max(1.6, lineWidth * 1.15);   // touching
+  const far  = 46;                                // widely scattered
+  return far * Math.pow(near / far, Math.min(1, Math.max(0, dl)));
+}
+function fmtDotSpacing(dl) {
+  return dl >= 0.999 ? 'line' : dotSpacingPx(dl, params.lineWidth).toFixed(1) + 'px gap';
+}
+function applyDotDash(c, dl, lineWidth) {
   if (dl >= 0.999) return null;
-  const dotCount = Math.max(10, Math.round(12 * Math.pow(560, dl)));
-  const period = Math.max(0.5, pathLen / dotCount);
-  // Dots keep their old chunky size at the bottom of the slider and settle onto the
-  // true line width well before the top — squared so the mid-range isn't fattened.
-  const fade = (1 - dl) * (1 - dl);
-  const w = lineWidth + (2 * Math.max(0.8, lineWidth) - lineWidth) * fade;
-  // Floor the dash at a fraction of the stroke width: Chrome renders a zero-length
-  // dash as nothing rather than as a round-capped dot, which made the sparse end of
-  // the slider look empty.
-  const dash = Math.min(period * 0.98, Math.max(w * 0.45, period * dl));
+  const period = dotSpacingPx(dl, lineWidth);
+  // Chrome draws a zero-length dash as nothing rather than as a round-capped dot,
+  // so the "on" length is a hair above zero and the cap makes the disc.
+  const w = Math.max(0.8, lineWidth);
+  const dash = Math.min(period * 0.5, 0.01);
   const arr = [dash, Math.max(0.01, period - dash)];
   c.setLineDash(arr);
   c.lineCap = 'round';
@@ -2411,82 +2472,121 @@ function trailAlpha() {
   return t < 0.01 ? 1 : Math.max(0.01, Math.pow(1 - t, 3));
 }
 
-// ── KEEP trails ──────────────────────────────────────────────────────────────
-// FADE dims the whole window every frame, so a mark always decays. KEEP does the
-// opposite: marks are permanent, and the only thing that removes one is the line
-// crossing it again. That is exactly Porter-Duff XOR — source and destination
-// both survive except where they overlap, where both cancel — so the frame is
-// drawn to a scratch layer and XOR-composited into a persistence buffer, which is
-// then blitted under the chrome.
+// ── Trails ───────────────────────────────────────────────────────────────────
+// Two rules govern this whole section.
 //
-// The catch with XOR is a still figure: drawing the identical frame twice would
-// cancel it, and the picture would strobe. So the frame is only folded in when
-// the figure has actually changed, which is what figureSignature() decides.
-let _trailCv = null, _trailCtx = null;     // the persistence buffer
-let _frameCv = null, _frameCtx = null;     // this frame's strokes, alone
-let _trailSig = '';
+// First, a trail belongs to the FIGURE and to nothing else. Painting a
+// translucent wash over the window — the old implementation — smeared the
+// construction view's rulers, strips and dots along with the curve, which made
+// the one part of the display whose job is to be read precisely into the blurriest
+// thing on screen. So the figure is drawn to its own layer, the trail happens
+// there, and the diagram's furniture is drawn fresh on top afterwards.
+//
+// Second, the two modes are genuinely different mechanisms, not two settings of
+// one:
+//
+//   FADE  is continuous. The layer keeps whatever was drawn into it and is eaten
+//         away a little each frame — destination-out rather than a wash of
+//         background, so the trail thins toward transparency instead of tinting
+//         toward the background colour, and the layer can be composited over
+//         anything.
+//
+//   KEEP  is discrete and stateless. There is no history buffer at all: the
+//         figure is simply drawn N times at evenly spaced phase offsets, so the
+//         "trail" is a set of copies of the curve at defined intervals rather
+//         than an accumulation of frames. That is what makes Count and Spacing
+//         meaningful, and it means the picture is identical however long the app
+//         has been running, survives a resize, and records correctly.
+//         The current line then ERASES what it crosses: the ghosts are cut away
+//         under its footprint before it is drawn, so the live curve reads as
+//         solid and the copies visibly give way to it, rather than the two just
+//         overlapping in the same colour.
+let _trCv = null, _trCtx = null;      // FADE: the persistence layer
+let _ghCv = null, _ghCtx = null;      // KEEP: this frame's ghosts
 
 function trailKeeps() { return Math.round(params.trailMode || 0) === 1; }
+function trailFades() { return !trailKeeps() && trailAlpha() < 0.999; }
+function trailActive() { return trailKeeps() ? (params.trailCount || 0) >= 1 : trailFades(); }
 
-function trailLayerReset() {               // called on resize and on demand
-  _trailCv = _trailCtx = _frameCv = _frameCtx = null;
-  _trailSig = '';
-}
-function clearTrail() { trailLayerReset(); }
-
-function _trailLayers() {
-  if (_trailCv && _trailCv.width === canvas.width && _trailCv.height === canvas.height) return;
-  _trailCv = document.createElement('canvas');
-  _trailCv.width = canvas.width; _trailCv.height = canvas.height;
-  _trailCtx = _trailCv.getContext('2d');
-  _frameCv = document.createElement('canvas');
-  _frameCv.width = canvas.width; _frameCv.height = canvas.height;
-  _frameCtx = _frameCv.getContext('2d');
-  _trailSig = '';
+function trailLayerReset() { _trCv = _trCtx = _ghCv = _ghCtx = null; }
+function clearTrail() {
+  if (_trCtx) { _trCtx.setTransform(1, 0, 0, 1, 0, 0); _trCtx.clearRect(0, 0, _trCv.width, _trCv.height); }
 }
 
-// Everything the drawn figure depends on, as a short string. Cheaper and far more
-// reliable than trying to enumerate "is something animating" by hand.
-function figureSignature(phase) {
-  let acc = '';
-  for (const k in params) { const v = params[k]; acc += (typeof v === 'number' ? v.toFixed(4) : v) + ','; }
-  return acc + phase.toFixed(5) + ',' + mode4T.toFixed(5) + ',' + rotSpinPhase.toFixed(3) + ',' +
-         _unisonDrift.toFixed(5) + ',' + waveTypeX + ',' + waveTypeY + ',' + (visualSwap ? 1 : 0) +
-         ',' + (constructionView ? 1 : 0) + ',' + filterType + ',' + (syncHard ? 1 : 0) + ',' + (syncSingle ? 1 : 0);
-}
-
-// Returns the context the frame's figure should be drawn into.
-function beginTrailFrame() {
-  _trailLayers();
-  const dpr = viewDpr;
-  _frameCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  _frameCtx.clearRect(0, 0, viewW, viewH);
-  _frameCtx.imageSmoothingEnabled = true;
-  return _frameCtx;
-}
-
-// Fold the frame into the persistence buffer (only if it moved), then blit.
-function commitTrailFrame(phase) {
-  const sig = figureSignature(phase);
-  if (sig !== _trailSig) {
-    _trailSig = sig;
-    _trailCtx.setTransform(1, 0, 0, 1, 0, 0);
-    _trailCtx.globalCompositeOperation = 'xor';
-    _trailCtx.drawImage(_frameCv, 0, 0);
-    _trailCtx.globalCompositeOperation = 'source-over';
+function _layer(which) {
+  const cur = which === 'tr' ? _trCv : _ghCv;
+  if (!cur || cur.width !== canvas.width || cur.height !== canvas.height) {
+    const cv = document.createElement('canvas');
+    cv.width = canvas.width; cv.height = canvas.height;
+    const c = cv.getContext('2d');
+    if (which === 'tr') { _trCv = cv; _trCtx = c; } else { _ghCv = cv; _ghCtx = c; }
   }
+  const c = which === 'tr' ? _trCtx : _ghCtx;
+  c.setTransform(viewDpr, 0, 0, viewDpr, 0, 0);
+  c.imageSmoothingEnabled = true;
+  return c;
+}
+
+// FADE: decay what the layer already holds, then hand it back to be drawn into.
+function beginFadeLayer() {
+  const c = _layer('tr');
+  const bite = trailAlpha();               // 1 = erase completely (no trail)
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'destination-out';
+  c.fillStyle = 'rgba(0,0,0,' + bite + ')';
+  c.fillRect(0, 0, _trCv.width, _trCv.height);
+  c.globalCompositeOperation = 'source-over';
+  c.setTransform(viewDpr, 0, 0, viewDpr, 0, 0);
+  return c;
+}
+function beginGhostLayer() {
+  const c = _layer('gh');
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, _ghCv.width, _ghCv.height);
+  c.setTransform(viewDpr, 0, 0, viewDpr, 0, 0);
+  return c;
+}
+function blitLayer(which) {
+  const cv = which === 'tr' ? _trCv : _ghCv;
+  if (!cv) return;
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);       // blit in device pixels, 1:1
-  ctx.drawImage(_trailCv, 0, 0);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(cv, 0, 0);
   ctx.restore();
 }
 
-// The backdrop under everything, across the whole window. In FADE mode it is a
-// translucent wash (that IS the afterglow); in KEEP mode it must be opaque, since
-// the persistence buffer holds the history instead.
-function paintBackdrop(keep) {
-  const a = keep ? 1 : trailAlpha();
-  ctx.fillStyle = a < 1 ? hexToRgba(params.bgColor, a) : params.bgColor;
+// Draw the figure — whichever view is showing — into `target`, at a phase offset.
+// Ghosts also wind the spin back in proportion, so a rotating figure leaves a
+// rotational trail rather than a stack of copies at the same angle.
+function drawFigureInto(target, phase, res, zoom, phaseBack) {
+  const spinSave = rotSpinPhase;
+  if (phaseBack && rotSpin) rotSpinPhase = rotSpinPhase - phaseBack * 62.5;   // deg per phase unit
+  target.save();
+  target.translate(figBox.x, figBox.y);
+  if (constructionView) drawMode4(target, figBox.size, figBox.size, phase, true, zoom, M4_FIGURE);
+  else drawLissajous(target, figBox.size, figBox.size, phase, res, zoom, true);
+  target.restore();
+  rotSpinPhase = spinSave;
+}
+
+// Clear whatever a copy is about to be drawn over, so a newer line visibly cuts
+// through an older one instead of the two merging into an indistinguishable mesh.
+// The clearance is only a little wider than the stroke: a fat brush would rub out
+// most of a neighbouring copy, since copies a small phase apart run close together
+// over much of their length.
+function eraseUnderFigure(target, phase, res, zoom, phaseBack) {
+  const lwSave = params.lineWidth;
+  params.lineWidth = lwSave * 1.35 + 0.7;
+  target.globalCompositeOperation = 'destination-out';
+  drawFigureInto(target, phase, res, zoom, phaseBack);
+  target.globalCompositeOperation = 'source-over';
+  params.lineWidth = lwSave;
+}
+
+// The backdrop under everything, across the whole window. Always opaque now: the
+// trail lives in its own layer, so the background has no part in it.
+function paintBackdrop() {
+  ctx.fillStyle = params.bgColor;
   ctx.fillRect(0, 0, viewW, viewH);
 }
 
@@ -2534,9 +2634,23 @@ function hexToRgba(hex, alpha) {
 // ── Mode 4 ───────────────────────────────────────────────────────────────────
 const _S = { x: 0, y: 0 };   // scratch point for the construction-view strip mappers
 let mode4T = 0;
+let _m4MemoPhase = NaN, _m4MemoRes = -1;   // per-frame sample memo (see drawMode4)
+// The tracer advances once per FRAME. drawMode4 runs several times per frame now
+// (figure, chrome, one pass per KEEP ghost), so it cannot own the clock.
+function advanceMode4() {
+  const T = TWO_PI / gcd(params.fx, params.fy);
+  mode4T = (mode4T + T * (params.traceSpeed ?? 1) * 0.003) % T;
+}
 let _m4BufX = new Float64Array(0), _m4BufY = new Float64Array(0);
 
-function drawMode4(ctx, w, h, phase, noBg) {  // w,h are logical (pre-dpr) pixels
+// part: M4_ALL draws everything; M4_FIGURE draws only the curve (untraced figure,
+// unison ghosts, traced arc) so it can be sent through the trail layer; M4_CHROME
+// draws the diagram itself (separators, generator strips, projection lines, the
+// three moving dots), which must never trail — a smeared ruler is not a ruler.
+const M4_ALL = 0, M4_FIGURE = 1, M4_CHROME = 2;
+function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pre-dpr) pixels
+  part = part || M4_ALL;
+  const wantFigure = part !== M4_CHROME, wantChrome = part !== M4_FIGURE;
   const { ax, fx, ay, fy, strokeColor, bgColor, lineWidth } = params;
   // phase passed in from render loop (animated)
 
@@ -2566,19 +2680,33 @@ function drawMode4(ctx, w, h, phase, noBg) {  // w,h are logical (pre-dpr) pixel
     ctx.fillRect(0, 0, w, h);
   }
 
+  // Zoom scales the WHOLE construction — strips, separators, projection lines and
+  // figure together — about the centre of the box, so the diagram stays coherent
+  // instead of the figure growing out of its own frame. The canvas is the window,
+  // so what overflows the box is still drawn.
+  const m4Zoom = Math.max(0.05, zoom || 1);
+  ctx.save();
+  if (m4Zoom !== 1) {
+    ctx.translate(w / 2, h / 2);
+    ctx.scale(m4Zoom, m4Zoom);
+    ctx.translate(-w / 2, -h / 2);
+  }
+
   // Separator lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.moveTo(margin, 0); ctx.lineTo(margin, margin); ctx.lineTo(0, margin);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(margin, 0); ctx.lineTo(margin, h);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(0, margin); ctx.lineTo(w, margin);
-  ctx.stroke();
+  if (wantChrome) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(margin, 0); ctx.lineTo(margin, margin); ctx.lineTo(0, margin);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(margin, 0); ctx.lineTo(margin, h);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, margin); ctx.lineTo(w, margin);
+    ctx.stroke();
+  }
 
   // ── Where the two generator waves are drawn ─────────────────────────────────
   // NORMAL: time runs along the long axis of each strip and amplitude across the
@@ -2586,14 +2714,19 @@ function drawMode4(ctx, w, h, phase, noBg) {  // w,h are logical (pre-dpr) pixel
   // but a generator's dot sits at its TIME position, which is not the coordinate
   // it contributes — so the lines joining the dots to the figure run diagonally.
   //
-  // ROTATED: each strip is turned a quarter turn, so its amplitude axis is the
+  // STRAIGHT: each strip is turned a quarter turn, so its amplitude axis is the
   // very axis it drives — the top wave's amplitude is measured left-to-right (the
-  // figure's x), the left wave's up-and-down (the figure's y). Time then runs
-  // into the depth of the strip. Only one cycle of each generator is shown, the
-  // one the tracer is currently inside, which is why the strips advance at
-  // different rates: the ratio IS how many cycles each fits into a lap. Because
-  // each dot now sits at its own amplitude, the two lines to the figure point are
-  // exactly vertical and exactly horizontal.
+  // figure's x), the left wave's up-and-down (the figure's y). Time runs into the
+  // depth of the strip, and the window is exactly one cycle wide.
+  //
+  // That window SCROLLS rather than stepping between whole cycles. Anchoring it to
+  // the cycle the tracer happens to be inside put the tracer's dot at a different
+  // depth each frame, so the projection line swung through the strip and jumped
+  // back at every cycle boundary. Here the window is always [t−Tcycle, t], which
+  // pins τ=t to the strip's inner edge: the dot sits at a FIXED depth and moves
+  // only along its own amplitude axis, while the waveform slides past underneath
+  // it. Each strip scrolls at its own side of the ratio, and the two lines from
+  // the generators to the moving point stay exactly vertical and horizontal.
   const m4Rot = !!params.m4Rotate;
   const stripAmp = margin / 2 - 6;
   const xMid = margin / 2;   // vertical centre of the top strip
@@ -2606,8 +2739,8 @@ function drawMode4(ctx, w, h, phase, noBg) {  // w,h are logical (pre-dpr) pixel
   const cycH = Math.max(1, Math.round((visualSwap ? fy : fx) / gR));
   const cycV = Math.max(1, Math.round((visualSwap ? fx : fy) / gR));
   const Th = T / cycH, Tv = T / cycV;                    // one cycle of each
-  const hStart = m4Rot ? Math.floor(mode4T / Th) * Th : 0;
-  const vStart = m4Rot ? Math.floor(mode4T / Tv) * Tv : 0;
+  const hStart = m4Rot ? mode4T - Th : 0;      // window ends AT the tracer
+  const vStart = m4Rot ? mode4T - Tv : 0;
   const hSpan  = m4Rot ? Th : T;
   const vSpan  = m4Rot ? Tv : T;
 
@@ -2627,12 +2760,17 @@ function drawMode4(ctx, w, h, phase, noBg) {  // w,h are logical (pre-dpr) pixel
   const N = res + 1;
   if (_m4BufX.length < N) { _m4BufX = new Float64Array(N); _m4BufY = new Float64Array(N); }
   const ampXArr = _m4BufX, ampYArr = _m4BufY;
-  for (let i = 0; i <= res; i++) {
-    const τ = (i / res) * T;
-    ampXArr[i] = processWave(fx * τ + phase * Math.PI, fx * τ, waveTypeX, 'x');
-    ampYArr[i] = processWave(fy * τ, fy * τ, waveTypeY, 'y');
-  }
-  {
+  // The figure pass and the chrome pass want the same samples. Memo them on the
+  // phase they were built at, reset once per frame by render(), so drawing the
+  // view in two passes costs one build rather than two — while a ghost at a
+  // different phase still gets its own.
+  if (_m4MemoPhase !== phase || _m4MemoRes !== res) {
+    _m4MemoPhase = phase; _m4MemoRes = res;
+    for (let i = 0; i <= res; i++) {
+      const τ = (i / res) * T;
+      ampXArr[i] = processWave(fx * τ + phase * Math.PI, fx * τ, waveTypeX, 'x');
+      ampYArr[i] = processWave(fy * τ, fy * τ, waveTypeY, 'y');
+    }
     const g = gcd(fx, fy);
     const cyclesX = fx / g, cyclesY = fy / g;   // waveform cycles within one period T
     if (filterIsOn()) {
@@ -2644,31 +2782,37 @@ function drawMode4(ctx, w, h, phase, noBg) {  // w,h are logical (pre-dpr) pixel
     }
   }
   // X/Y swap mirrors the main view; sample the filtered arrays by time.
-  const idxAt = τ => { let k = Math.round((τ / T) * res); return k < 0 ? 0 : (k > res ? res : k); };
+  // The scrolling window reaches back past τ=0, and the waveform is periodic in T,
+  // so the index wraps rather than clamping (clamping would flatten the leading
+  // edge of the strip into a straight line).
+  const idxAt = τ => { let k = Math.round((τ / T) * res) % res; return k < 0 ? k + res : k; };
   const hAt = τ => visualSwap ? ampYArr[idxAt(τ)] : ampXArr[idxAt(τ)];
   const vAt = τ => visualSwap ? ampXArr[idxAt(τ)] : ampYArr[idxAt(τ)];
 
-  // ── The horizontal generator: top strip
-  const stripRes = Math.min(res, 2048);
-  ctx.strokeStyle = hexToRgba(strokeColor, 0.55);
-  ctx.lineWidth = Math.max(1, lineWidth * 0.8);
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  ctx.beginPath();
-  for (let i = 0; i <= stripRes; i++) {
-    const τ = hStart + (i / stripRes) * hSpan;
-    hPt(τ, hAt(τ));
-    i === 0 ? ctx.moveTo(_S.x, _S.y) : ctx.lineTo(_S.x, _S.y);
-  }
-  ctx.stroke();
+  if (wantChrome) {
+    // ── The horizontal generator: top strip
+    const stripRes = Math.min(res, 2048);
+    ctx.strokeStyle = hexToRgba(strokeColor, 0.55);
+    ctx.lineWidth = Math.max(1, lineWidth * 0.8);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    for (let i = 0; i <= stripRes; i++) {
+      const τ = hStart + (i / stripRes) * hSpan;
+      hPt(τ, hAt(τ));
+      i === 0 ? ctx.moveTo(_S.x, _S.y) : ctx.lineTo(_S.x, _S.y);
+    }
+    ctx.stroke();
 
-  // ── The vertical generator: left strip
-  ctx.beginPath();
-  for (let i = 0; i <= stripRes; i++) {
-    const τ = vStart + (i / stripRes) * vSpan;
-    vPt(τ, vAt(τ));
-    i === 0 ? ctx.moveTo(_S.x, _S.y) : ctx.lineTo(_S.x, _S.y);
+    // ── The vertical generator: left strip
+    ctx.beginPath();
+    for (let i = 0; i <= stripRes; i++) {
+      const τ = vStart + (i / stripRes) * vSpan;
+      vPt(τ, vAt(τ));
+      i === 0 ? ctx.moveTo(_S.x, _S.y) : ctx.lineTo(_S.x, _S.y);
+    }
+    ctx.stroke();
   }
-  ctx.stroke();
 
   // ── Figure rendering — full visual pipeline (z / rotation axis / shear /
   // mirrors / fill / unison ghosts), matching the main view. The strips stay
@@ -2692,37 +2836,26 @@ function drawMode4(ctx, w, h, phase, noBg) {  // w,h are logical (pre-dpr) pixel
   };
 
   // Surface fill (front + back), as in the main view.
-  if (params.fillSurface) {
+  if (wantFigure && params.fillSurface) {
     for (const [mx, my] of m4Mirrors) {
       if (figureHasDepth()) { m4Path(0, mx, my, true, true); ctx.fillStyle = hexToRgba(strokeColor, 0.08); ctx.fill('evenodd'); }
       m4Path(0, mx, my, true, false); ctx.fillStyle = hexToRgba(strokeColor, 0.13); ctx.fill('evenodd');
     }
   }
 
-  // Dots ↔ Line applies here too — same continuous dash morph as the main view.
-  // Path length is estimated from one traced lap of the figure box.
+  // Dots ↔ Line applies here too, at the same pixel pitch as the main view.
   const dl4 = params.dotsLine ?? 1;
-  let m4Dash = null;
-  if (dl4 < 0.999) {
-    let pathLen = 0, lx = 0, ly = 0;
-    const S = Math.min(res, 512), [g0x, g0y] = m4Mirrors[0];
-    for (let d = 0; d <= S; d++) {
-      const τ = (d / S) * T;
-      figureXform(hAt(τ), vAt(τ), fzr * τ, false);
-      const xp = cx + rx * _Q.x * g0x, yp = cy + ry * _Q.y * g0y;
-      if (d) pathLen += Math.hypot(xp - lx, yp - ly);
-      lx = xp; ly = yp;
-    }
-    m4Dash = applyDotDash(ctx, dl4, lineWidth, pathLen);
-  }
+  const m4Dash = applyDotDash(ctx, dl4, lineWidth);
 
   // Full Lissajous (dim = the untraced part), every mirror image.
-  ctx.strokeStyle = hexToRgba(strokeColor, Math.max(0, Math.min(1, params.untracedAlpha)));
-  if (!m4Dash) ctx.lineWidth = lineWidth;
-  for (const [mx, my] of m4Mirrors) { m4Path(0, mx, my, false, false); ctx.stroke(); }
+  if (wantFigure) {
+    ctx.strokeStyle = hexToRgba(strokeColor, Math.max(0, Math.min(1, params.untracedAlpha)));
+    if (!m4Dash) ctx.lineWidth = lineWidth;
+    for (const [mx, my] of m4Mirrors) { m4Path(0, mx, my, false, false); ctx.stroke(); }
+  }
 
   // Unison ghosts (± detune copies), dimmer than the untraced figure.
-  if ((params.unisonMix || 0) > 0.01) {
+  if (wantFigure && (params.unisonMix || 0) > 0.01) {
     const gxy = gcd(fx, fy);
     const τOff = ((unisonOffsetCycles() % 1) * T) / (fx / gxy);   // in X-cycles
     if (τOff > 0.0001) {
@@ -2744,15 +2877,17 @@ function drawMode4(ctx, w, h, phase, noBg) {  // w,h are logical (pre-dpr) pixel
   vPt(t, yAmpNow); const yDotX = _S.x, yDotY = _S.y;   // dot on the left strip
 
   // ── Projection lines (dashed): from each strip's moving dot to the figure point
-  ctx.setLineDash([3, 5]);
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = hexToRgba(strokeColor, 0.3);
-  ctx.beginPath(); ctx.moveTo(xDotX, xDotY); ctx.lineTo(figPx, figPy); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(yDotX, yDotY); ctx.lineTo(figPx, figPy); ctx.stroke();
-  ctx.setLineDash(m4Dash || []);   // restore the Dots ↔ Line dash for the trail
+  if (wantChrome) {
+    ctx.setLineDash([3, 5]);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = hexToRgba(strokeColor, 0.3);
+    ctx.beginPath(); ctx.moveTo(xDotX, xDotY); ctx.lineTo(figPx, figPy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(yDotX, yDotY); ctx.lineTo(figPx, figPy); ctx.stroke();
+  }
+  ctx.setLineDash(m4Dash || []);   // restore the Dots ↔ Line dash for the traced arc
 
-  // ── Bright trail (0 → t, current cycle), transformed + mirrored like the figure
-  if (t > 0.0001) {
+  // ── Traced arc (0 → t, current cycle), transformed + mirrored like the figure
+  if (wantFigure && t > 0.0001) {
     const trailRes = Math.max(4, Math.ceil(res * (t / T)));
     ctx.strokeStyle = hexToRgba(strokeColor, 0.85);
     if (!m4Dash) ctx.lineWidth = lineWidth;   // dashed morph keeps its own width
@@ -2769,16 +2904,86 @@ function drawMode4(ctx, w, h, phase, noBg) {  // w,h are logical (pre-dpr) pixel
   }
 
   // ── Dots
-  if (m4Dash) { ctx.setLineDash([]); ctx.lineWidth = lineWidth; }   // don't leak into the strips
-  ctx.fillStyle = strokeColor;
-  ctx.beginPath(); ctx.arc(xDotX, xDotY, 4, 0, Math.PI*2); ctx.fill(); // x strip
-  ctx.beginPath(); ctx.arc(yDotX, yDotY, 4, 0, Math.PI*2); ctx.fill(); // y strip
-  ctx.beginPath(); ctx.arc(figPx, figPy, 5.5, 0, Math.PI*2); ctx.fill(); // figure
+  ctx.setLineDash([]); ctx.lineWidth = lineWidth;   // don't leak into the strips
+  if (wantChrome) {
+    ctx.fillStyle = strokeColor;
+    ctx.beginPath(); ctx.arc(xDotX, xDotY, 4, 0, Math.PI*2); ctx.fill(); // x strip
+    ctx.beginPath(); ctx.arc(yDotX, yDotY, 4, 0, Math.PI*2); ctx.fill(); // y strip
+    ctx.beginPath(); ctx.arc(figPx, figPy, 5.5, 0, Math.PI*2); ctx.fill(); // figure
+  }
 
-  // ── Advance time (tracing tempo is independent of the phase-animation speed)
-  mode4T = (mode4T + T * (params.traceSpeed ?? 1) * 0.003) % T;
+  ctx.restore();   // end zoom
 }
 
+
+// ── Wave out: the two axis waveforms as MIDI CCs ─────────────────────────────
+// A DAW modulator, not an audio signal. The oscillators run at audio rates — a
+// hundred-odd hertz — which is meaningless as a CC stream and impossible to send
+// anyway. What is actually wanted is the shape you can SEE: the figure's own lap
+// rate, with each axis at its own side of the ratio, so a 3:2 figure at one lap a
+// second sends three hertz on X against two on Y.
+//
+// Values come from a small dedicated buffer rather than from processWave directly,
+// because the multimode filter is a periodic convolution over a whole lap — it
+// cannot be evaluated at a single point — and leaving it out would send something
+// that no longer matched the drawn curve.
+let woOn = false, woPortId = '', woCh = 1, woCCX = 16, woCCY = 17, woRate = 1, woFollow = true;
+let woLap = 0;                                  // position within the lap, 0..1
+let woLastX = -1, woLastY = -1;                 // last 7-bit values actually sent
+const WO_N = 512;                               // samples per lap — ample for 7 bits
+let _woBufX = new Float64Array(WO_N + 1), _woBufY = new Float64Array(WO_N + 1);
+
+function woBuild() {
+  const { fx, fy } = params;
+  const T = TWO_PI / gcd(fx, fy);
+  for (let i = 0; i <= WO_N; i++) {
+    const τ = (i / WO_N) * T;
+    _woBufX[i] = processWave(fx * τ + params.phase * Math.PI, fx * τ, waveTypeX, 'x');
+    _woBufY[i] = processWave(fy * τ, fy * τ, waveTypeY, 'y');
+  }
+  if (filterIsOn()) {
+    const g = gcd(fx, fy), HC = filterHarmonics();
+    const wX = Math.PI * 2 * Math.min(0.49, (HC * (fx / g)) / WO_N);
+    const wY = Math.PI * 2 * Math.min(0.49, (HC * (fy / g)) / WO_N);
+    filterPeriodic(_woBufX, WO_N + 1, biquadCoeffs(filterType, wX, params.filterQ));
+    filterPeriodic(_woBufY, WO_N + 1, biquadCoeffs(filterType, wY, params.filterQ));
+  }
+}
+
+function tickWaveOut(dt) {
+  if (!woOn) return;
+  const out = midiAccess && woPortId ? midiAccess.outputs.get(woPortId) : null;
+
+  // Position in the lap. Following the tracer keeps the stream and the moving dot
+  // on the construction view in lockstep — what is sent is exactly what is shown.
+  if (woFollow && constructionView) {
+    woLap = (mode4T / (TWO_PI / gcd(params.fx, params.fy))) % 1;
+  } else {
+    woLap = (woLap + woRate * dt) % 1;
+    if (woLap < 0) woLap += 1;
+  }
+
+  woBuild();
+  const i = Math.min(WO_N, Math.max(0, Math.round(woLap * WO_N)));
+  const to7 = v => Math.max(0, Math.min(127, Math.round((v * 0.5 + 0.5) * 127)));
+  const vx = to7(visualSwap ? _woBufY[i] : _woBufX[i]);
+  const vy = to7(visualSwap ? _woBufX[i] : _woBufY[i]);
+
+  if (out) {
+    const st = 0xB0 | ((Math.max(1, Math.min(16, woCh)) - 1) & 0x0F);
+    if (vx !== woLastX) { try { out.send([st, woCCX & 0x7F, vx]); } catch (e) {} woLastX = vx; }
+    if (vy !== woLastY) { try { out.send([st, woCCY & 0x7F, vy]); } catch (e) {} woLastY = vy; }
+  }
+
+  const st = document.getElementById('wo-status');
+  if (st) {
+    const g = gcd(params.fx, params.fy);
+    // The tracer steps T × traceSpeed × 0.003 per frame at 60fps, i.e. one lap
+    // every 1/(traceSpeed × 0.18) seconds.
+    const hz = (woFollow && constructionView) ? (params.traceSpeed ?? 1) * 0.18 : woRate;
+    st.textContent = `X ${vx} (${(hz * params.fx / g).toFixed(2)} Hz) · Y ${vy} (${(hz * params.fy / g).toFixed(2)} Hz)`;
+  }
+}
 
 // MIDI target state — CC handler writes here only, never touches params or DOM
 const midiTarget = {};
@@ -2846,7 +3051,24 @@ function render(now) {
     updateStatus();
   }
 
-  // Adaptive res regardless of MIDI state — use a lower quality multiplier during MIDI bursts
+  // Apply smoothed (interpolated) MIDI-CC mappings to base params first, so LFOs
+  // modulate on top of the freshly-set base values.
+  tickMappings(lfodt);
+
+  // Preset morph writes interpolated base values on top of which LFOs modulate.
+  tickPresetMorph(now);
+
+  // Apply BEFORE advancing, so one LFO modulating the other's rate actually bends
+  // it, and before the phase step below, so Anim Speed is a real target too.
+  applyLFOs();
+  advanceLFOs(lfodt);
+
+  // While LFO-modulated values are live in params, rebuild audio + sync sliders.
+  pwTick(now);
+  tickLFOSliders(now);
+
+  // Adaptive resolution and the phase step read fx/fy/animSpeed, so they are
+  // computed from the modulated values rather than the base ones.
   const { fx, fy } = params;
   const pf = lcm(fx, fy) / Math.min(fx, fy);
   const minResAdaptive = Math.ceil(Math.max(fx, fy) * pf * (midiActive ? 36 : 80) * Math.min(modComplexity(), 10));
@@ -2863,42 +3085,57 @@ function render(now) {
     phase = params.phase;
   }
 
-
-  // Apply smoothed (interpolated) MIDI-CC mappings to base params first, so LFOs
-  // modulate on top of the freshly-set base values.
-  tickMappings(lfodt);
-
-  // Preset morph writes interpolated base values on top of which LFOs modulate.
-  tickPresetMorph(now);
-
   // Frame-advance the visual animators: rotation spin + unison ghost drift.
   if (rotSpin) rotSpinPhase = (rotSpinPhase + 0.25 * animSpeed) % 360;
   if ((params.unisonMix || 0) > 0.01) _unisonDrift = (_unisonDrift + (params.unisonDetune || 0) * 0.0008) % 1;
 
-  advanceLFOs(lfodt);
-  applyLFOs();
+  if (constructionView && animating) animPhase = (animPhase + 0.004 * animSpeed) % 2;
+  const drawPhase = constructionView ? (animating ? animPhase : params.phase) : phase;
+  const zoom = Math.max(0.6, recZoom);
+  _m4MemoPhase = NaN; _figMemoPhase = NaN;    // the sample memos are per-frame
 
-  // While LFO-modulated values are live in params, rebuild audio + sync sliders.
-  pwTick(now);
-  tickLFOSliders(now);
+  paintBackdrop();
 
-  // Backdrop first, across the WHOLE window (this is what makes the trail work
-  // at window scale), then the figure inside its box.
-  const keep = trailKeeps();
-  const drawInto = keep ? beginTrailFrame() : ctx;
-  paintBackdrop(keep);
-  drawInto.save();
-  drawInto.translate(figBox.x, figBox.y);
-  if (constructionView) {
-    if (animating) animPhase = (animPhase + 0.004 * animSpeed) % 2;
-    drawMode4(drawInto, figBox.size, figBox.size, animating ? animPhase : params.phase, true);
+  if (trailKeeps() && (params.trailCount || 0) >= 1) {
+    // Ghosts oldest-first so newer copies sit on top, then the live curve erases
+    // its way through them and is drawn solid.
+    const g = beginGhostLayer();
+    const n = Math.round(params.trailCount);
+    const d = params.trailSpacing || 0.08;
+    // Ghosts are context, not detail — a lower resolution keeps N copies of a
+    // heavily modulated figure inside the frame budget.
+    const gRes = Math.min(res, 2400);
+    // Oldest first, and each copy clears its own footprint before it is stroked,
+    // so the stack reads front-to-back: every line erases the older ones it
+    // crosses. The live curve does the same, then is drawn on the canvas itself.
+    for (let k = n; k >= 1; k--) {
+      const kp = drawPhase - k * d;
+      eraseUnderFigure(g, kp, gRes, zoom, k * d);
+      drawFigureInto(g, kp, gRes, zoom, k * d);
+    }
+    eraseUnderFigure(g, drawPhase, gRes, zoom, 0);
+    blitLayer('gh');
+    drawFigureInto(ctx, drawPhase, res, zoom, 0);
+  } else if (trailFades()) {
+    const L = beginFadeLayer();
+    drawFigureInto(L, drawPhase, res, zoom, 0);
+    blitLayer('tr');
   } else {
-    drawLissajous(drawInto, figBox.size, figBox.size, phase, res, Math.max(0.6, recZoom), true);
+    drawFigureInto(ctx, drawPhase, res, zoom, 0);
   }
-  drawInto.restore();
-  if (keep) commitTrailFrame(constructionView ? animPhase : phase);
+
+  // The diagram's own furniture, always fresh — never trailed, never faded.
+  if (constructionView) {
+    ctx.save();
+    ctx.translate(figBox.x, figBox.y);
+    drawMode4(ctx, figBox.size, figBox.size, drawPhase, true, zoom, M4_CHROME);
+    ctx.restore();
+    advanceMode4();
+  }
 
   if (recording) captureRecFrame(phase);
+
+  tickWaveOut(lfodt);
 
   restoreLFOs();
 }
@@ -3294,13 +3531,33 @@ const VEL_RANGES = {
   traceSpeed:    [0, 5],
   untracedAlpha: [0, 1],
 };
+// Fill in every remaining CC-mappable parameter from the mapping registry, so the
+// two can never disagree about a parameter's range. Toggles get [0,1] and are
+// thresholded on the way in. Deferred until MAP_TARGETS exists.
+function completeVelRanges() {
+  Object.keys(MAP_TARGETS).forEach(k => {
+    if (VEL_RANGES[k]) return;
+    const t = MAP_TARGETS[k];
+    VEL_RANGES[k] = t.toggle ? [0, 1] : [t.min, t.max];
+  });
+  LFO_TARGET_OPTIONS = Object.keys(MAP_TARGETS)
+    .filter(k => k !== 'preset')
+    .map(k => [k, MAP_TARGETS[k].label]);
+}
+// Steps, so a quantised parameter (frequency, mirror mode, wave type) lands on
+// legal values under modulation instead of between them.
+function targetStep(key) {
+  const t = MAP_TARGETS[key];
+  if (!t) return 0;
+  return t.toggle ? 1 : (t.step || 0);
+}
 
 // Per-parameter sidebar slider bindings (so modulation/MIDI can reflect in UI).
 const PARAM_UI = {
   fmAmount:  { slider: 'fm-amount',  disp: 'fm-amount-val',  fmt: v => v.toFixed(1) },
   filterCutoff: { slider: 'filter-freq', disp: 'filter-freq-val', fmt: v => fmtCutoff(v) },
   filterQ:   { slider: 'filter-res', disp: 'filter-res-val', fmt: v => v.toFixed(1) },
-  dotsLine:  { slider: 'dots-line',  disp: 'dots-line-val',  fmt: v => (v >= 0.999 ? 'line' : Math.round(v*100) + '%') },
+  dotsLine:  { slider: 'dots-line',  disp: 'dots-line-val',  fmt: fmtDotSpacing },
   traceSpeed:    { slider: 'trace-speed',    disp: 'trace-speed-val',    fmt: v => v.toFixed(1) + '×' },
   untracedAlpha: { slider: 'untraced-alpha', disp: 'untraced-alpha-val', fmt: v => Math.round(v*100) + '%' },
   shapeAmt:  { slider: 'shape-amt',  disp: 'shape-amt-val',  fmt: v => v.toFixed(2) },
@@ -3328,20 +3585,58 @@ const PARAM_UI = {
 };
 
 // ── LFO engine ───────────────────────────────────────────────────────────────
-const LFO_TARGET_OPTIONS = [
-  ['fmAmount','FM Amount'], ['fmRatio','FM Ratio'], ['crossFm','Cross FM'], ['ringAmt','Ring Mod'],
-  ['fbAmt','Feedback'], ['shapeAmt','Waveshape'],
-  ['amAmt','AM Depth'], ['amRatio','AM Ratio'], ['foldDrive','Drive (fold)'], ['foldBias','Fold Bias'],
-  ['crushBits','Crush Bits'], ['crushRate','Decimate'],
-  ['syncAmt','Sync'], ['noiseAmt','Noise (wave)'], ['filterCutoff','Filter Cutoff'], ['filterQ','Filter Reso'],
-  ['unisonDetune','Unison Detune'], ['unisonMix','Unison Mix'],
-  ['ax','X Amplitude'], ['ay','Y Amplitude'], ['phase','Phase'], ['lineWidth','Line Width'], ['dotsLine','Dots ↔ Line'],
-  ['rotateAngle','Rotate'], ['shearAmt','Shear'], ['trailAmt','Trail'], ['fz','Z Ratio'], ['az','Z Depth'],
-  ['traceSpeed','Trace Tempo'], ['untracedAlpha','Untraced Opacity'],
-];
+// The LFOs and the CC mappings address the SAME set of parameters. They used to
+// disagree — the LFO list was a hand-maintained subset that had drifted well
+// behind MAP_TARGETS — so the list is now derived from that one registry and
+// cannot fall behind it again.
+//
+// The engine's model is transient: applyLFOs() writes modulated values in place,
+// the frame is drawn and the audio rebuilt from them, restoreLFOs() puts the base
+// values back. That works directly for anything stored in `params`, which is most
+// of the registry. The rest — the colour, the wave types, the view toggles, the
+// other LFO's own rate — lives elsewhere, so each gets a get/set pair here.
+// Anything not listed defaults to params[key].
+const LFO_BINDINGS = {
+  hue:   { get: () => strokeHSL.h, set: v => { strokeHSL.h = v; params.strokeColor = hslToHex(strokeHSL.h, strokeHSL.s, strokeHSL.l); } },
+  sat:   { get: () => strokeHSL.s, set: v => { strokeHSL.s = v; params.strokeColor = hslToHex(strokeHSL.h, strokeHSL.s, strokeHSL.l); } },
+  light: { get: () => strokeHSL.l, set: v => { strokeHSL.l = v; params.strokeColor = hslToHex(strokeHSL.h, strokeHSL.s, strokeHSL.l); } },
+  waveX: { get: () => Math.max(0, WAVES.indexOf(waveTypeX)), set: v => { waveTypeX = WAVES[Math.max(0, Math.min(3, Math.round(v)))]; } },
+  waveY: { get: () => Math.max(0, WAVES.indexOf(waveTypeY)), set: v => { waveTypeY = WAVES[Math.max(0, Math.min(3, Math.round(v)))]; } },
+  animSpeed: { get: () => animSpeed, set: v => { animSpeed = v; } },
+  lfo0Rate:  { get: () => lfos[0].freq,  set: v => { lfos[0].freq = v; } },
+  lfo0Depth: { get: () => lfos[0].depth, set: v => { lfos[0].depth = v; } },
+  lfo1Rate:  { get: () => lfos[1].freq,  set: v => { lfos[1].freq = v; } },
+  lfo1Depth: { get: () => lfos[1].depth, set: v => { lfos[1].depth = v; } },
+  rotSpin:          { get: () => rotSpin ? 1 : 0,          set: v => { rotSpin = v >= 0.5; } },
+  constructionView: { get: () => constructionView ? 1 : 0, set: v => { constructionView = v >= 0.5; } },
+  animatePhase:     { get: () => animating ? 1 : 0,        set: v => { animating = v >= 0.5; } },
+  visualSwap:       { get: () => visualSwap ? 1 : 0,       set: v => { visualSwap = v >= 0.5; } },
+  // Volume is an audio node, not a value the frame reads. Writing it every frame
+  // IS the modulation (a tremolo); the restore only puts the JS mirror back, and
+  // the graph keeps whatever was last set.
+  volume: {
+    get: () => (params.volume !== undefined ? params.volume : parseFloat(document.getElementById('audio-vol').value)),
+    set: v => { if (masterGain && audioCtx) masterGain.gain.setTargetAtTime(v, audioCtx.currentTime, 0.01); },
+  },
+};
+function lfoGet(key) {
+  const b = LFO_BINDINGS[key];
+  if (b) return b.get();
+  return params[key] !== undefined ? params[key] : (MAP_DEFAULTS[key] !== undefined ? MAP_DEFAULTS[key] : 0);
+}
+function lfoSet(key, v) {
+  const b = LFO_BINDINGS[key];
+  if (b) { b.set(v); return; }
+  params[key] = v;
+}
+// Everything CC-mappable is LFO-assignable, with one exception: `preset` jumps
+// the whole ratio grid and rebuilds the audio graph on every step, which is not
+// something to do sixty times a second. X/Y Frequency reach the same territory
+// smoothly and are on the list.
+let LFO_TARGET_OPTIONS = [];   // filled by completeVelRanges(), below MAP_TARGETS
 // Keys whose modulation requires rebuilding the periodic wavetable (noise and the
 // unison pair are live audio nodes tracked in pwTick, so they're excluded here).
-const LFO_SYNTH_KEYS = ['fmAmount','fmRatio','crossFm','ringAmt','fbAmt','shapeAmt','syncAmt','foldDrive','foldBias','crushBits','crushRate','amAmt','amRatio','filterCutoff','filterQ'];
+const LFO_SYNTH_KEYS = ['fmAmount','fmRatio','crossFm','ringAmt','fbAmt','shapeAmt','syncAmt','foldDrive','foldBias','crushBits','crushRate','amAmt','amRatio','filterCutoff','filterQ','waveX','waveY','noiseAmt'];
 
 function lfoWaveFn(phase, type) {
   // phase in [0,1]
@@ -3382,7 +3677,7 @@ function lfoOutput(lfo) {
 function applyLFOs() {
   const keys = new Set();
   lfos.forEach(l => l.assignments.forEach(k => keys.add(k)));
-  keys.forEach(k => _lfoSaved[k] = params[k]);
+  keys.forEach(k => _lfoSaved[k] = lfoGet(k));
   _lfoSavedKeys = keys;
   lfos.forEach(lfo => {
     if (!lfo.assignments.length) return;
@@ -3390,13 +3685,16 @@ function applyLFOs() {
     lfo.assignments.forEach(key => {
       const r = VEL_RANGES[key]; if (!r) return;
       const [lo, hi] = r;
-      params[key] = Math.max(lo, Math.min(hi, params[key] + v * (hi - lo) * 0.5));
+      let nv = Math.max(lo, Math.min(hi, lfoGet(key) + v * (hi - lo) * 0.5));
+      const st = targetStep(key);
+      if (st) nv = Math.max(lo, Math.min(hi, Math.round(nv / st) * st));
+      lfoSet(key, nv);
     });
   });
 }
 
 function restoreLFOs() {
-  if (_lfoSavedKeys) _lfoSavedKeys.forEach(k => params[k] = _lfoSaved[k]);
+  if (_lfoSavedKeys) _lfoSavedKeys.forEach(k => lfoSet(k, _lfoSaved[k]));
 }
 
 function retriggerLFOs() {
@@ -4018,7 +4316,7 @@ document.getElementById('filter-res').addEventListener('input', e => {
 // Dots ↔ Line (figure-only) and Phase-rotates-modulators toggle.
 document.getElementById('dots-line').addEventListener('input', e => {
   params.dotsLine = parseFloat(e.target.value);
-  document.getElementById('dots-line-val').textContent = params.dotsLine >= 0.999 ? 'line' : Math.round(params.dotsLine * 100) + '%';
+  document.getElementById('dots-line-val').textContent = fmtDotSpacing(params.dotsLine);
 });
 
 // ── Visual transform sliders (figure-only — no wavetable rebuild needed) ──────
@@ -4064,11 +4362,21 @@ function setTrailMode(m) {
   const keepRow = document.getElementById('trail-keep-row');
   if (row) row.style.display = m === 1 ? 'none' : '';
   if (keepRow) keepRow.style.display = m === 1 ? '' : 'none';
+  clearTrail();
 }
 document.querySelectorAll('.wave-btn[data-trailmode]').forEach(btn => {
   btn.addEventListener('click', () => setTrailMode(parseInt(btn.dataset.trailmode)));
 });
-document.getElementById('trail-clear').addEventListener('click', clearTrail);
+const TRAIL_KEEP_SLIDERS = [
+  ['trail-count',   'trailCount',   v => String(Math.round(v))],
+  ['trail-spacing', 'trailSpacing', v => v.toFixed(3) + 'π'],
+];
+TRAIL_KEEP_SLIDERS.forEach(([id, key, fmt]) => {
+  document.getElementById(id).addEventListener('input', e => {
+    params[key] = parseFloat(e.target.value);
+    document.getElementById(id + '-val').textContent = fmt(params[key]);
+  });
+});
 
 // Rotation axis: Z (in-plane) / Y (vertical) / X (horizontal).
 function setRotAxis(a) {
@@ -4082,7 +4390,17 @@ document.querySelectorAll('.wave-btn[data-rotaxis]').forEach(btn => {
 });
 
 document.getElementById('rotate-spin').addEventListener('change', e => { rotSpin = e.target.checked; });
-document.getElementById('m4-rotate').addEventListener('change', e => { params.m4Rotate = e.target.checked ? 1 : 0; });
+function setM4Rotate(on) {
+  params.m4Rotate = on ? 1 : 0;
+  document.querySelectorAll('.wave-btn[data-m4rot]').forEach(b => {
+    const active = (parseInt(b.dataset.m4rot) === params.m4Rotate);
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+document.querySelectorAll('.wave-btn[data-m4rot]').forEach(btn => {
+  btn.addEventListener('click', () => setM4Rotate(parseInt(btn.dataset.m4rot) === 1));
+});
 document.getElementById('fill-surface').addEventListener('change', e => { params.fillSurface = e.target.checked ? 1 : 0; });
 
 // Unison: params + push straight onto the live oscillator pair.
@@ -4489,11 +4807,13 @@ document.getElementById('midi-map-input-select').addEventListener('change', e =>
 if (navigator.requestMIDIAccess) {
   navigator.requestMIDIAccess({ sysex: false }).then(access => {
     midiAccess = access;
+    woPopulatePorts();
     populateInputs();
     attachAllInputs();
     setMidiStatus('', 'select an input');
 
     access.onstatechange = () => {
+      woPopulatePorts();
       populateInputs();
       attachAllInputs();
       updateMidiStatusText();
@@ -4655,8 +4975,10 @@ const MAP_TARGETS = {
   shearAmt:  { label:'Shear',         min:-1,   max:1,              apply:v => setSliderParam('shearAmt','shear-amt','shear-amt-val',x=>x.toFixed(2),v) },
   trailAmt:  { label:'Trail',         min:0,    max:0.97,           apply:v => setSliderParam('trailAmt','trail-amt','trail-amt-val',x=>(x<0.01?'off':Math.round(x*100)+'%'),v) },
   mirrorMode:{ label:'Mirror Mode',   min:0,    max:3,   step:1,    apply:v => setMirrorMode(v) },
-  m4Rotate:{ label:'Rotate Generators', toggle:true, apply:b => { params.m4Rotate = b ? 1 : 0; const cb=document.getElementById('m4-rotate'); if (cb) cb.checked = b; } },
+  m4Rotate:{ label:'Straight Generators', toggle:true, apply:b => setM4Rotate(b) },
   trailMode:{ label:'Trail Mode',     min:0,    max:1,   step:1,    apply:v => setTrailMode(v) },
+  trailCount:{ label:'Trail Count',   min:0,    max:16,  step:1,    apply:v => setSliderParam('trailCount','trail-count','trail-count-val',x=>String(Math.round(x)),v) },
+  trailSpacing:{ label:'Trail Spacing', min:0.005, max:0.5,        apply:v => setSliderParam('trailSpacing','trail-spacing','trail-spacing-val',x=>x.toFixed(3)+'π',v) },
   fz:        { label:'Z Ratio',       min:0,    max:8,   step:0.5,  apply:v => setSliderParam('fz','fz','fz-val',x=>(x<0.01?'off':(Number.isInteger(x)?x:x.toFixed(1))),v) },
   az:        { label:'Z Depth',       min:0,    max:1,              apply:v => setSliderParam('az','az','az-val',x=>Math.round(x*100)+'%',v) },
   waveX:     { label:'X Wave Cycle',  min:0,    max:3,   step:1,    apply:v => setBaseWave('x', WAVES[Math.max(0,Math.min(3,Math.round(v)))]) },
@@ -4674,12 +4996,15 @@ const MAP_TARGETS = {
   volume:    { label:'Volume',        min:0,    max:1,              apply:v => { document.getElementById('audio-vol').value=v; document.getElementById('vol-val').textContent=Math.round(v*100)+'%'; if (masterGain) masterGain.gain.setTargetAtTime(v, audioCtx.currentTime, 0.02); } },
   filterCutoff:{ label:'Filter Cutoff', min:0, max:1,              apply:v => { params.filterCutoff=v; const e=document.getElementById('filter-freq'); if(e)e.value=v; const d=document.getElementById('filter-freq-val'); if(d)d.textContent=fmtCutoff(v); drawWavePreview(); schedulePeriodicWaveUpdate(); } },
   filterQ:   { label:'Filter Reso',   min:0.1,  max:20,             apply:v => { params.filterQ=v; const e=document.getElementById('filter-res'); if(e)e.value=v; const d=document.getElementById('filter-res-val'); if(d)d.textContent=v.toFixed(1); drawWavePreview(); schedulePeriodicWaveUpdate(); } },
-  dotsLine:  { label:'Dots ↔ Line',   min:0,    max:1,              apply:v => { params.dotsLine=v; const e=document.getElementById('dots-line'); if(e)e.value=v; const d=document.getElementById('dots-line-val'); if(d)d.textContent=(v>=0.999?'line':Math.round(v*100)+'%'); } },
+  dotsLine:  { label:'Dots ↔ Line',   min:0,    max:1,              apply:v => { params.dotsLine=v; const e=document.getElementById('dots-line'); if(e)e.value=v; const d=document.getElementById('dots-line-val'); if(d)d.textContent=fmtDotSpacing(v); } },
   preset:    { label:'Preset Scroll', min:0,    max:PRESETS.length-1, step:1, apply:v => { const p = PRESETS[Math.max(0,Math.min(PRESETS.length-1,Math.round(v)))]; if (p) applyPreset(p.fx, p.fy); } },
   constructionView: { label:'Construction View', toggle:true, apply:b => { constructionView = b; const cb=document.getElementById('construction-view'); cb.checked=b; if (b) mode4T=0; } },
   animatePhase:     { label:'Animate Phase',     toggle:true, apply:b => { animating = b; document.getElementById('animate').checked=b; document.getElementById('anim-speed-row').style.opacity = b ? '1' : '0.4'; } },
   visualSwap:       { label:'Visual X/Y Swap',   toggle:true, apply:b => { visualSwap = b; updateSwapBtn(); } },
 };
+// The LFO target list and the remaining LFO ranges are derived from the registry
+// above, so the two can never drift apart again.
+completeVelRanges();
 
 // Starting values per mappable target — used to restore params when MIDI disconnects.
 const MAP_DEFAULTS = {
@@ -4687,7 +5012,7 @@ const MAP_DEFAULTS = {
   syncAmt:1, foldDrive:1, amAmt:0, amRatio:2, noiseAmt:0, waveX:0, waveY:0,
   crossFm:0, ringAmt:0, fbAmt:0, foldBias:0, crushBits:16, crushRate:0,
   unisonDetune:0, unisonMix:0,
-  rotateAngle:0, rotAxis:0, rotSpin:0, fillSurface:0, shearAmt:0, trailAmt:0, trailMode:0, mirrorMode:0, m4Rotate:0, fz:0, az:0,
+  rotateAngle:0, rotAxis:0, rotSpin:0, fillSurface:0, shearAmt:0, trailAmt:0, trailMode:0, trailCount:4, trailSpacing:0.08, mirrorMode:0, m4Rotate:1, fz:0, az:0,
   lfo0Rate:0.5, lfo0Depth:0.5, lfo1Rate:1.0, lfo1Depth:0.5,
   hue:79, sat:84, light:66, lineWidth:1.5, phase:0.5, animSpeed:1, volume:0.5,
   filterCutoff:1, filterQ:0.7, dotsLine:1,
@@ -4924,6 +5249,47 @@ function updateMapBound(m) {
   const learn = row.parentElement.querySelector('.map-cc-btn');
   if (learn && mapLearnId !== m.id) learn.classList.toggle('bound', m.ccNum !== null);
 }
+
+// ── Wave-out controls ────────────────────────────────────────────────────────
+function woPopulatePorts() {
+  const sel = document.getElementById('wo-port');
+  if (!sel) return;
+  const prev = woPortId;
+  sel.innerHTML = '<option value="">— no MIDI output —</option>';
+  if (midiAccess) midiAccess.outputs.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.id; opt.textContent = o.name || o.id;
+    sel.appendChild(opt);
+  });
+  sel.value = midiAccess && midiAccess.outputs.get(prev) ? prev : '';
+  woPortId = sel.value;
+}
+function woSetEnabled(on) {
+  woOn = !!on;
+  document.getElementById('wo-on').checked = woOn;
+  document.getElementById('wo-controls').style.opacity = woOn ? '1' : '0.45';
+  woLastX = woLastY = -1;
+}
+(() => {
+  const ch = document.getElementById('wo-ch');
+  for (let c = 1; c <= 16; c++) {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c; ch.appendChild(o);
+  }
+  ch.value = woCh;
+  ch.addEventListener('change', e => { woCh = parseInt(e.target.value) || 1; woLastX = woLastY = -1; });
+  document.getElementById('wo-on').addEventListener('change', e => woSetEnabled(e.target.checked));
+  document.getElementById('wo-port').addEventListener('change', e => { woPortId = e.target.value; woLastX = woLastY = -1; });
+  document.getElementById('wo-cc-x').addEventListener('input', e => { woCCX = Math.max(0, Math.min(119, parseInt(e.target.value) || 0)); woLastX = -1; });
+  document.getElementById('wo-cc-y').addEventListener('input', e => { woCCY = Math.max(0, Math.min(119, parseInt(e.target.value) || 0)); woLastY = -1; });
+  document.getElementById('wo-rate').addEventListener('input', e => {
+    woRate = parseFloat(e.target.value);
+    document.getElementById('wo-rate-val').textContent = woRate.toFixed(2) + ' laps/s';
+  });
+  document.getElementById('wo-follow').addEventListener('change', e => { woFollow = e.target.checked; });
+  woSetEnabled(false);
+  woPopulatePorts();
+})();
 
 document.getElementById('map-add').addEventListener('click', () => addMapping('fx'));
 
@@ -5163,14 +5529,15 @@ function refreshAllControls() {
   setFilterType(filterType);
   setS('filter-freq', params.filterCutoff, 'filter-freq-val', () => fmtCutoff(params.filterCutoff));
   setS('filter-res', params.filterQ, 'filter-res-val', v => v.toFixed(1));
-  setS('dots-line', params.dotsLine ?? 1, 'dots-line-val', v => (v >= 0.999 ? 'line' : Math.round(v*100) + '%'));
+  setS('dots-line', params.dotsLine ?? 1, 'dots-line-val', fmtDotSpacing);
   VISUAL_SLIDERS.forEach(([id, key, fmt]) => setS(id, params[key] ?? 0, id + '-val', fmt));
   UNISON_SLIDERS.forEach(([id, key, fmt]) => setS(id, params[key] ?? 0, id + '-val', fmt));
   setMirrorMode(params.mirrorMode ?? 0);
   setTrailMode(params.trailMode ?? 0);
+  TRAIL_KEEP_SLIDERS.forEach(([id, key, fmt]) => setS(id, params[key] ?? 0, id + '-val', fmt));
   setRotAxis(params.rotAxis ?? 0);
   document.getElementById('rotate-spin').checked = rotSpin;
-  document.getElementById('m4-rotate').checked = !!params.m4Rotate;
+  setM4Rotate(!!params.m4Rotate);
   document.getElementById('fill-surface').checked = !!params.fillSurface;
   setS('map-slew', mapSlewTau, 'map-slew-val', fmtSlew);
   applyUnisonAudio();
@@ -5286,10 +5653,7 @@ function captureRecFrame(phase) {
     fullCtx.fillRect(0, 0, F, F);
     fullCtx.drawImage(canvas, Math.round(figBox.x * d), Math.round(figBox.y * d), s, s, 0, 0, F, F);
   } else if (constructionView) {
-    // Capture the construction view; preserve mode4T so it advances once per frame.
-    const saved = mode4T;
-    drawMode4(fullCtx, F, F, phase);
-    mode4T = saved;
+    drawMode4(fullCtx, F, F, phase, false, Math.max(0.6, recZoom));
   } else {
     drawLissajous(fullCtx, F, F, phase, params.resolution, Math.max(0.6, recZoom));
   }
@@ -5430,6 +5794,7 @@ EVOLVE_KEYS.forEach(k => { evolveInclude[k] = !EVOLVE_DEFAULT_OFF.has(k); });
 
 // Read a target's current value (mirror of MAP_TARGETS apply()).
 function readTarget(key) {
+  if (LFO_BINDINGS[key]) return LFO_BINDINGS[key].get();
   switch (key) {
     case 'waveX': return Math.max(0, WAVES.indexOf(waveTypeX));
     case 'waveY': return Math.max(0, WAVES.indexOf(waveTypeY));
@@ -5625,7 +5990,7 @@ let _morph = null;
 // is meaningless (ratios would explode the figure's period mid-glide).
 // 'phase' is excluded entirely (never recalled — see applyPresetData) so the
 // running animation stays continuous across a preset change.
-const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'trailMode', 'm4Rotate', 'phase']);
+const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'trailMode', 'trailCount', 'm4Rotate', 'phase']);
 function lerpHex(a, b, u) {
   const pa = a.replace('#',''), pb = b.replace('#','');
   const c = i => Math.round(parseInt(pa.slice(i,i+2),16) + (parseInt(pb.slice(i,i+2),16) - parseInt(pa.slice(i,i+2),16)) * u);
