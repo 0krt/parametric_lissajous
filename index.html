@@ -1043,6 +1043,12 @@
           <button class="mod-wave-btn" data-mod="am" data-mwave="sawtooth">SAW</button>
           <button class="mod-wave-btn" data-mod="am" data-mwave="square">SQR</button>
         </div>
+        <div class="param-header" style="margin:6px 0 4px"><label>Applies to</label></div>
+        <div class="wave-toggle">
+          <button class="wave-btn active" data-amroute="0" style="font-size:9px">BOTH</button>
+          <button class="wave-btn" data-amroute="1" style="font-size:9px">X</button>
+          <button class="wave-btn" data-amroute="2" style="font-size:9px">Y</button>
+        </div>
       </div>
 
       <div class="mod-group">
@@ -1061,6 +1067,12 @@
           <button class="mod-wave-btn" data-mod="fm" data-mwave="triangle">TRI</button>
           <button class="mod-wave-btn" data-mod="fm" data-mwave="sawtooth">SAW</button>
           <button class="mod-wave-btn" data-mod="fm" data-mwave="square">SQR</button>
+        </div>
+        <div class="param-header" style="margin:6px 0 4px"><label>Applies to</label></div>
+        <div class="wave-toggle">
+          <button class="wave-btn active" data-fmroute="0" style="font-size:9px">BOTH</button>
+          <button class="wave-btn" data-fmroute="1" style="font-size:9px">X</button>
+          <button class="wave-btn" data-fmroute="2" style="font-size:9px">Y</button>
         </div>
       </div>
 
@@ -1598,12 +1610,14 @@ let params = {
   fmAmount: 0,    // frequency modulation depth
   fmRatio: 2,     // frequency modulation ratio
   fmWave: 'sine', // FM modulator waveform
+  fmRoute: 0,     // FM destination: 0 = both axes, 1 = X only, 2 = Y only
   shapeAmt: 0,    // waveshaping (tanh) drive
   syncAmt: 1,     // sync ratio (1 = off), range 0.1..2.0
   foldDrive: 1,
   amAmt: 0,
   amRatio: 2,
   amWave: 'sine', // AM modulator waveform
+  amRoute: 0,     // AM destination: 0 = both axes, 1 = X only, 2 = Y only
   noiseAmt: 0,    // additive noise amount on the waveform (0..0.1)
   crossFm: 0,     // cross-axis FM: each axis phase-modulated by the other's carrier (0..2)
   ringAmt: 0,     // ring mod between axes: X×Y multiplied into each axis (0..1)
@@ -1703,6 +1717,14 @@ function foldValue(x) {
 
 const TWO_PI = Math.PI * 2;
 
+// FM / AM destination routing: 0 = both axes, 1 = X only, 2 = Y only. Routing a
+// modulator to one axis makes the two axes genuinely different waveforms (see the
+// PeriodicWave reuse guard in applyPeriodicWave).
+function modHitsAxis(route, axis) {
+  const r = Math.round(route || 0);
+  return r === 0 || (r === 1 ? axis === 'x' : axis === 'y');
+}
+
 // Full modulation chain:
 //   decimate → FM (phase) → cross FM → Sync → base wave (+feedback) → waveshape →
 //   fold (+bias) → AM → ring mod → bitcrush → noise
@@ -1726,7 +1748,7 @@ function processWave(carrierArg, freqT, type, axis) {
   const modPhase = phaseModulators ? (carrierArg - freqT) : 0;
   let ph = carrierArg;
   // Frequency Modulation: true-FM style, index scales with 1/ratio
-  if (params.fmAmount > 0.0001) ph += (params.fmAmount / params.fmRatio) * waveFn(params.fmRatio * freqT + modPhase, params.fmWave);
+  if (params.fmAmount > 0.0001 && modHitsAxis(params.fmRoute, axis)) ph += (params.fmAmount / params.fmRatio) * waveFn(params.fmRatio * freqT + modPhase, params.fmWave);
   // Cross-axis FM: this axis's phase is modulated by the OTHER axis's carrier (its
   // base wave at its frequency ratio). Couples the two axes — small amounts smear /
   // precess the figure. The other axis's phase relative to this one is freqT scaled
@@ -1763,7 +1785,7 @@ function processWave(carrierArg, freqT, type, axis) {
   // Fold — the bias offsets the input into the folder, breaking its symmetry
   if (params.foldDrive > 1.001 || Math.abs(params.foldBias) > 0.001) s = foldValue(s * params.foldDrive + params.foldBias);
   // AM (normalized)
-  if (params.amAmt > 0.001) s = s * (1 + params.amAmt * waveFn(params.amRatio * freqT + modPhase, params.amWave)) / (1 + params.amAmt);
+  if (params.amAmt > 0.001 && modHitsAxis(params.amRoute, axis)) s = s * (1 + params.amAmt * waveFn(params.amRatio * freqT + modPhase, params.amWave)) / (1 + params.amAmt);
   // Ring mod between axes: multiply in the other axis's carrier. At full amount
   // this is a pure X×Y product (petal / star symmetries).
   if (params.ringAmt > 0.001) {
@@ -2452,6 +2474,21 @@ function setModWave(mod, type) {
 }
 document.querySelectorAll('.mod-wave-btn').forEach(btn => {
   btn.addEventListener('click', () => setModWave(btn.dataset.mod, btn.dataset.mwave));
+});
+
+// FM / AM destination: both axes, X only, or Y only.
+function setModRoute(mod, r) {
+  r = Math.max(0, Math.min(2, Math.round(r)));
+  if (mod === 'fm') params.fmRoute = r; else if (mod === 'am') params.amRoute = r; else return;
+  document.querySelectorAll(`.wave-btn[data-${mod}route]`).forEach(b =>
+    b.classList.toggle('active', parseInt(b.dataset[mod + 'route']) === r));
+  drawWavePreview();
+  schedulePeriodicWaveUpdate();
+}
+['fm', 'am'].forEach(mod => {
+  document.querySelectorAll(`.wave-btn[data-${mod}route]`).forEach(btn => {
+    btn.addEventListener('click', () => setModRoute(mod, parseInt(btn.dataset[mod + 'route'])));
+  });
 });
 
 function updateStatus() {
@@ -4055,11 +4092,13 @@ const MAP_TARGETS = {
   ay:        { label:'Y Amplitude',   min:0.1,  max:1,              apply:v => { params.ay = v; const e=document.getElementById('ay'); if(e)e.value=v; const d=document.getElementById('ay-val'); if(d)d.textContent=v.toFixed(2); } },
   fmAmount:  { label:'FM Amount',     min:0,    max:8,              apply:_synthApply('fmAmount','fm-amount','fm-amount-val',x=>x.toFixed(1)) },
   fmRatio:   { label:'FM Ratio',      min:0.5,  max:8,              apply:v => setRatioParam('fmRatio','fm-ratio','fm-ratio-val',v) },
+  fmRoute:   { label:'FM Applies To', min:0,    max:2,   step:1,    apply:v => setModRoute('fm', v) },
   shapeAmt:  { label:'Waveshape',     min:0,    max:1,              apply:_synthApply('shapeAmt','shape-amt','shape-amt-val',x=>x.toFixed(2)) },
   syncAmt:   { label:'Sync Ratio',    min:0.1,  max:2,   step:0.05, apply:_synthApply('syncAmt','sync-amt','sync-amt-val',x=>x.toFixed(2)) },
   foldDrive: { label:'Drive (fold)',  min:1,    max:8,              apply:_synthApply('foldDrive','fold-drive','fold-drive-val',x=>x.toFixed(1)) },
   amAmt:     { label:'AM Depth',      min:0,    max:1,              apply:_synthApply('amAmt','am-amt','am-amt-val',x=>x.toFixed(2)) },
   amRatio:   { label:'AM Ratio',      min:0.5,  max:8,              apply:v => setRatioParam('amRatio','am-ratio','am-ratio-val',v) },
+  amRoute:   { label:'AM Applies To', min:0,    max:2,   step:1,    apply:v => setModRoute('am', v) },
   noiseAmt:  { label:'Noise (wave)',  min:0,    max:0.1,            apply:_synthApply('noiseAmt','noise-amt','noise-amt-val',x=>x.toFixed(3)) },
   crossFm:   { label:'Cross FM',      min:0,    max:2,              apply:_synthApply('crossFm','cross-fm','cross-fm-val',x=>x.toFixed(2)) },
   ringAmt:   { label:'Ring Mod',      min:0,    max:1,              apply:_synthApply('ringAmt','ring-amt','ring-amt-val',x=>x.toFixed(2)) },
@@ -4102,7 +4141,7 @@ const MAP_TARGETS = {
 
 // Starting values per mappable target — used to restore params when MIDI disconnects.
 const MAP_DEFAULTS = {
-  fx:3, fy:2, ax:1, ay:1, fmAmount:0, fmRatio:2, shapeAmt:0,
+  fx:3, fy:2, ax:1, ay:1, fmAmount:0, fmRatio:2, shapeAmt:0, fmRoute:0, amRoute:0,
   syncAmt:1, foldDrive:1, amAmt:0, amRatio:2, noiseAmt:0, waveX:0, waveY:0,
   crossFm:0, ringAmt:0, fbAmt:0, foldBias:0, crushBits:16, crushRate:0,
   unisonDetune:0, unisonMix:0,
@@ -4488,7 +4527,10 @@ function applyPeriodicWave() {
     // Reuse X's wave only when both axes are truly identical (same base type and
     // no per-axis sync difference) — otherwise build Y separately.
     const syncDiffers = syncSingle && Math.abs(params.syncAmt - 1) > 0.001;
-    const pwY = (waveTypeY === waveTypeX && !syncDiffers) ? pwX : buildPeriodicWave(waveTypeY, 'y');
+    // A modulator routed to a single axis also makes the axes differ, so the shared
+    // wave is only valid when FM and AM both hit both axes.
+    const routeDiffers = Math.round(params.fmRoute || 0) !== 0 || Math.round(params.amRoute || 0) !== 0;
+    const pwY = (waveTypeY === waveTypeX && !syncDiffers && !routeDiffers) ? pwX : buildPeriodicWave(waveTypeY, 'y');
     if (pwY) oscY.setPeriodicWave(pwY);
     if (pwX && oscX2) oscX2.setPeriodicWave(pwX);
     if (pwY && oscY2) oscY2.setPeriodicWave(pwY);
@@ -4570,6 +4612,8 @@ function refreshAllControls() {
   setBaseWave('y', waveTypeY);
   setModWave('fm', params.fmWave || 'sine');
   setModWave('am', params.amWave || 'sine');
+  setModRoute('fm', params.fmRoute || 0);
+  setModRoute('am', params.amRoute || 0);
   document.getElementById('animate').checked = animating;
   setS('anim-speed', animSpeed, 'speed-val', v => v.toFixed(1) + '×');
   document.getElementById('anim-speed-row').style.opacity = animating ? '1' : '0.4';
@@ -5012,7 +5056,7 @@ let _morph = null;
 // is meaningless (ratios would explode the figure's period mid-glide).
 // 'phase' is excluded entirely (never recalled — see applyPresetData) so the
 // running animation stays continuous across a preset change.
-const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'phase']);
+const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'phase', 'fmRoute', 'amRoute']);
 function lerpHex(a, b, u) {
   const pa = a.replace('#',''), pb = b.replace('#','');
   const c = i => Math.round(parseInt(pa.slice(i,i+2),16) + (parseInt(pb.slice(i,i+2),16) - parseInt(pa.slice(i,i+2),16)) * u);
