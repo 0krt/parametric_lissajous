@@ -326,6 +326,13 @@
     display: block;
     z-index: 0;
   }
+  /* Only the phase lift gives the figure a spatial meaning to drag, so the grab
+     cursor appears only then. The canvas itself is painted behind .layout, which
+     covers the window, so the cursor lives on the covering element instead.
+     touch-action lets a touch drag orbit rather than scroll the page under it. */
+  body.orbit .layout, body.orbit .canvas-area { cursor: grab; touch-action: none; }
+  body.orbit .sidebar, body.orbit header, body.orbit .preset-sidebar { cursor: auto; }
+  body.orbit-dragging .layout, body.orbit-dragging .canvas-area { cursor: grabbing; }
 
   /* An empty placeholder: it owns no pixels, it only tells resize() where the
      figure's square belongs. Its children (frame preview, interval label) ride
@@ -1903,20 +1910,61 @@
         <label for="fill-surface">Fill surface (front &amp; back)</label>
       </div>
       <div class="mod-group">
-        <div class="vel-row"><span class="vel-label">3D depth (Z axis)</span></div>
-        <div class="param-row">
+        <div class="vel-row"><span class="vel-label">3D depth</span></div>
+        <div class="param-header" style="margin-bottom:4px"><label>Depth source</label></div>
+        <div class="wave-toggle" style="margin-bottom:6px">
+          <button class="wave-btn" data-depthsrc="0" aria-pressed="false">FLAT</button>
+          <button class="wave-btn" data-depthsrc="1" aria-pressed="false">PHASE LIFT</button>
+          <button class="wave-btn active" data-depthsrc="2" aria-pressed="true">Z OSC</button>
+        </div>
+        <div class="param-row" id="fz-row">
           <div class="param-header"><label>Z ratio</label><span class="val" id="fz-val">off</span></div>
           <input type="range" id="fz" min="0" max="8" step="0.5" value="0">
         </div>
         <div class="param-row">
-          <div class="param-header"><label>Depth</label><span class="val" id="az-val">0%</span></div>
+          <div class="param-header"><label id="az-label">Depth</label><span class="val" id="az-val">0%</span></div>
           <input type="range" id="az" min="0" max="1" step="0.01" value="0">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Tilt</label><span class="val" id="tilt-angle-val">0°</span></div>
+          <input type="range" id="tilt-angle" min="-89" max="89" step="1" value="0">
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="depth-shade" checked>
+          <label for="depth-shade">Depth shading &mdash; far strokes dimmer, thinner (lift only)</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="show-shadow">
+          <label for="show-shadow">Show the flat shadow</label>
+        </div>
+        <div class="info-text" data-info-label="the phase lift">
+          The animated figure reads as a wire object turning about a central axis
+          because it is one. <strong>sin(fx·t + δ)</strong> expands to
+          <strong>sin(fx·t)·cos δ + cos(fx·t)·sin δ</strong> — the x of the
+          <em>fixed</em> curve <em>(sin fx·t, sin fy·t, cos fx·t)</em>, wound on a
+          vertical cylinder of radius <em>ax</em>, turned by δ about that cylinder's
+          axis. The flat figure is its shadow, and animating δ is spinning it.
+          <strong>PHASE LIFT</strong> stops discarding the third coordinate.
+          With <strong>Tilt</strong> and <strong>Depth</strong> at zero the picture is
+          unchanged to the pixel — that is the proof, not a bug. Raise
+          <strong>Tilt</strong> to look at it from off-axis (or drag on the figure),
+          <strong>Depth</strong> to add perspective, and <strong>Show the flat
+          shadow</strong> to keep the original figure visible underneath.
+          <strong>The identity is exact for sine only.</strong> Setting δ = 0 and then
+          δ = π/2 pins both coordinates, and nothing but a sinusoid satisfies what is
+          left: a phase shift moves harmonic <em>n</em> by <em>n</em>·δ, which no single
+          rotation can do. With a triangle, saw or square base wave, or with FM, sync,
+          fold, crush or feedback in play, the lifted object is a close relative of the
+          animation rather than the same thing. The waveform filter is the exception
+          — it is linear, so it commutes with the rotation exactly. While the lift is
+          on, δ no longer moves the waveform, so <em>Phase rotates FM/AM
+          modulators</em> has nothing to act on.
         </div>
       </div>
       <div class="number-input"><label>Resolution</label><input type="number" id="resolution" value="2000" min="100" max="10000" step="100"></div>
 
       <div class="param-row" style="margin-top:12px">
-        <div class="param-header"><label>δ (phase position)</label><span class="val" id="phase-val">0.50π</span></div>
+        <div class="param-header"><label id="phase-label">δ (phase position)</label><span class="val" id="phase-val">0.50π</span></div>
         <input type="range" id="phase" min="0" max="2" step="0.01" value="0.5">
       </div>
       <div class="checkbox-row">
@@ -2103,6 +2151,10 @@ let params = {
   mirrorMode: 0,   // 0 = off, 1 = mirror X, 2 = mirror Y, 3 = 4-fold kaleidoscope
   fz: 0,           // z-axis (depth) frequency ratio; 0 = 2D (visual)
   az: 0,           // z-axis depth amount 0..1 — perspective scaling (visual)
+  depthSrc: 2,     // depth source: 0 = flat, 1 = phase lift (δ becomes rotation), 2 = z oscillator
+  tiltAngle: 0,    // orbit elevation, degrees: tips the spin axis toward the viewer (visual)
+  depthShade: 1,   // 1 = depth-cue the stroke (far = dimmer + thinner), drawn back-to-front
+  showShadow: 0,   // 1 = also draw the flat orthographic projection the lifted figure casts
   traceSpeed: 1,      // construction view: figure-tracing tempo (independent of phase anim speed)
   untracedAlpha: 0.2, // construction view: opacity of the not-yet-traced background figure
   m4Rotate: 1,        // construction view: 1 = quarter-turned scrolling generators (default)
@@ -2144,6 +2196,8 @@ function filterPeriodic(arr, n, c) {
 }
 // Reusable buffers for the figure's per-axis sample sequences.
 let _figBufX = new Float64Array(0), _figBufY = new Float64Array(0);
+let _figBufZ = new Float64Array(0);   // lift mode only: the quadrature (depth) sequence
+let _eraseMode = false;               // true while stroking the destination-out clearance pass
 let _audioSampling = false; // true while sampling processWave for audio (skips visual noise)
 
 let animating = true;
@@ -2308,17 +2362,33 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
   // process them before they're drawn.
   const N = resolution + 1;
   if (_figBufX.length < N) { _figBufX = new Float64Array(N); _figBufY = new Float64Array(N); }
-  const sxArr = _figBufX, syArr = _figBufY;
+  const lift = liftActive();
+  if (lift && _figBufZ.length < N) _figBufZ = new Float64Array(N);
+  const sxArr = _figBufX, syArr = _figBufY, szArr = _figBufZ;
   const span = Math.PI * 2 * lcm(fx, fy) / Math.min(fx, fy);
   // Memo on (phase, resolution), reset once per frame by render(). KEEP trails
   // stroke each copy twice — once to clear what is under it, once to draw it —
   // and both passes want the same samples, so this halves the sampling work.
-  if (_figMemoPhase !== phase || _figMemoRes !== resolution) {
-    _figMemoPhase = phase; _figMemoRes = resolution;
+  // In lift mode δ never reaches the sampler — it is applied downstream as a
+  // rotation — so the sample set is phase-independent and the key drops it. That
+  // also means the N copies of a KEEP trail sample ONCE between them, not N times.
+  const memoPhase = lift ? -1 : phase;
+  if (_figMemoPhase !== memoPhase || _figMemoRes !== resolution || _figMemoLift !== lift) {
+    _figMemoPhase = memoPhase; _figMemoRes = resolution; _figMemoLift = lift;
     for (let i = 0; i <= resolution; i++) {
       const t = (i / resolution) * span;
-      sxArr[i] = processWave(fx * t + phase * Math.PI, fx * t, waveTypeX, 'x');
+      sxArr[i] = processWave(fx * t + (lift ? 0 : phase * Math.PI), fx * t, waveTypeX, 'x');
       syArr[i] = processWave(fy * t, fy * t, waveTypeY, 'y');
+    }
+    // The depth coordinate: the SAME wave a quarter period ahead. For a sine that
+    // is a cosine, so (x, z) rides a circle of radius ax and yawing the curve by
+    // δπ reproduces sin(fx·t + δπ) exactly — the figure is the shadow. See the
+    // note above liftActive() for why only sinusoids get that exactly.
+    if (lift) {
+      for (let i = 0; i <= resolution; i++) {
+        const t = (i / resolution) * span;
+        szArr[i] = processWave(fx * t + Math.PI / 2, fx * t, waveTypeX, 'x');
+      }
     }
     // ── Multimode filter + comb (final waveform stages) ────────────────────────
     if (filterIsOn()) {
@@ -2327,6 +2397,9 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
       const wY = Math.PI * 2 * Math.min(0.49, (HC * fy * periodFactor) / resolution);
       filterPeriodic(sxArr, N, biquadCoeffs(filterType, wX, params.filterQ));
       filterPeriodic(syArr, N, biquadCoeffs(filterType, wY, params.filterQ));
+      // Depth gets the X axis's own coefficients: filtering it differently would
+      // pull it out of quadrature and buckle the cylinder.
+      if (lift) filterPeriodic(szArr, N, biquadCoeffs(filterType, wX, params.filterQ));
     }
   }
   const cyclesX = fx * periodFactor, cyclesY = fy * periodFactor;
@@ -2337,8 +2410,8 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
   targetCtx.lineJoin = 'round';
   targetCtx.lineCap = 'round';
 
-  // ── Visual transforms: shared z / rotation-axis / shear pipeline + mirrors ───
-  beginFigureXform();
+  // ── Visual transforms: shared depth / rotation-axis / shear pipeline + mirrors ─
+  beginFigureXform(phase, false, rx / ry);
   const zRatio = params.fz || 0;
   const mirrors = figureMirrors();
 
@@ -2346,14 +2419,41 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
   // the surface fill. k shifts the X axis ONLY (in samples) — that's what a detuned
   // unison does: it slides X against Y, opening and closing the figure. Shifting
   // both axes together would just retrace the same closed curve (invisible).
+  // The lift's depth is indexed with the SAME k as X: the two are one oscillator
+  // seen in quadrature, so sliding one and not the other would buckle the cylinder.
   const pt = (i, k, mx, my, zFlip) => {
-    const xs = sxArr[k ? (i + k) % resolution : i];
+    const idx = k ? (i + k) % resolution : i;
+    const xs = sxArr[idx];
     const ys = syArr[i];
     figureXform(visualSwap ? ys : xs, visualSwap ? xs : ys,
-                zRatio * (i / resolution) * span, zFlip);
+                lift ? szArr[idx] : figureZ(zRatio * (i / resolution) * span), zFlip);
     _P.x = cx + rx * _Q.x * mx;
     _P.y = cy + ry * _Q.y * my;
   };
+
+  // ── The shadow the lifted figure casts ──────────────────────────────────────
+  // The lift's whole claim is that the flat figure was this object's shadow all
+  // along. So draw the shadow: the same curve projected orthographically, with the
+  // orbit tilt and the perspective stripped out, which is by construction exactly
+  // the 2D figure at δ. At tilt 0 it vanishes under the figure — that coincidence
+  // IS the proof — and tilting away separates the object from what it throws.
+  if (lift && params.showShadow && !_eraseMode) {
+    beginFigureXform(phase, true, rx / ry);
+    targetCtx.setLineDash([]);
+    targetCtx.strokeStyle = hexToRgba(strokeColor, 0.18);
+    targetCtx.lineWidth = Math.max(1, lineWidth * 0.9);
+    for (const [mx, my] of mirrors) {
+      targetCtx.beginPath();
+      for (let i = 0; i <= resolution; i++) {
+        pt(i, 0, mx, my, false);
+        i === 0 ? targetCtx.moveTo(_P.x, _P.y) : targetCtx.lineTo(_P.x, _P.y);
+      }
+      targetCtx.stroke();
+    }
+    targetCtx.strokeStyle = strokeColor;
+    targetCtx.lineWidth = lineWidth;
+    beginFigureXform(phase, false, rx / ry);
+  }
 
   // Surface fill: even-odd fill of the closed figure path so its enclosed area
   // reads as a woven surface. With depth present the far face (z mirrored) is
@@ -2386,14 +2486,61 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
   // drops a 1024-point pre-pass per frame.
   const dashOn = !!applyDotDash(targetCtx, dl, lineWidth);
 
+  // ── Depth cueing ────────────────────────────────────────────────────────────
+  // A single stroked path can neither self-occlude nor vary along its length, so
+  // where there is real depth the curve is split by view-space z into DEPTH_BINS
+  // Path2Ds and stroked back to front: far strokes dimmer and thinner, near
+  // strokes brighter and fatter. That is what turns a tangle of lines into a
+  // solid you can read the near face of.
+  //
+  // Sorting per segment is out of the question at the 160k-point resolution cap —
+  // and it isn't needed. The curve is continuous, so consecutive points nearly
+  // always land in the same bin; emitting RUNS (a moveTo only where the bin
+  // changes) keeps the subpath count at O(cycles·bins) while every point still
+  // costs exactly one lineTo. Same order as the single-path route, plus one bin
+  // index per point.
+  const DEPTH_BINS = 16;
+  // Scoped to the lift on purpose: the z oscillator's look is already baked into
+  // saved presets, while the lift is new and has none to disturb — and without the
+  // cue a lifted figure reads as a flat tangle rather than as an object.
+  const shaded = !!params.depthShade && lift && !_eraseMode;
+
   const drawFigure = (k) => {
     for (const [mx, my] of mirrors) {
-      targetCtx.beginPath();
+      if (!shaded) {
+        targetCtx.beginPath();
+        for (let i = 0; i <= resolution; i++) {
+          pt(i, k, mx, my, false);
+          i === 0 ? targetCtx.moveTo(_P.x, _P.y) : targetCtx.lineTo(_P.x, _P.y);
+        }
+        targetCtx.stroke();
+        continue;
+      }
+      const bins = new Array(DEPTH_BINS);   // filled lazily: a shallow curve touches few
+      let prevX = 0, prevY = 0, prevBin = -1;
       for (let i = 0; i <= resolution; i++) {
         pt(i, k, mx, my, false);
-        i === 0 ? targetCtx.moveTo(_P.x, _P.y) : targetCtx.lineTo(_P.x, _P.y);
+        const x = _P.x, y = _P.y;
+        if (i > 0) {
+          // _Q.z is view depth, positive away from the viewer — so bin 0 is nearest.
+          let b = ((_Q.z + 1) * 0.5 * DEPTH_BINS) | 0;
+          if (b < 0) b = 0; else if (b >= DEPTH_BINS) b = DEPTH_BINS - 1;
+          const path = bins[b] || (bins[b] = new Path2D());
+          if (b !== prevBin) path.moveTo(prevX, prevY);   // a run starts where the bin changes
+          path.lineTo(x, y);
+          prevBin = b;
+        }
+        prevX = x; prevY = y;
       }
-      targetCtx.stroke();
+      for (let b = DEPTH_BINS - 1; b >= 0; b--) {          // painter's order: far first
+        if (!bins[b]) continue;
+        const near = 1 - b / (DEPTH_BINS - 1);             // 0 = farthest, 1 = nearest
+        targetCtx.strokeStyle = hexToRgba(strokeColor, 0.28 + 0.72 * near);
+        targetCtx.lineWidth = lineWidth * (0.62 + 0.5 * near);
+        targetCtx.stroke(bins[b]);
+      }
+      targetCtx.strokeStyle = strokeColor;
+      targetCtx.lineWidth = lineWidth;
     }
   };
 
@@ -2424,6 +2571,7 @@ const MIRROR_SETS = [
 function figureMirrors() { return MIRROR_SETS[Math.max(0, Math.min(3, Math.round(params.mirrorMode || 0)))]; }
 const _P = { x: 0, y: 0 };      // scratch point for drawLissajous
 let _figMemoPhase = NaN, _figMemoRes = -1;   // per-frame sample memo (see drawLissajous)
+let _figMemoLift = null;                     // ...and which depth mode built it
 let _unisonDrift = 0;           // unison ghost precession (cycles); advanced in render()
 // How far the unison ghosts sit from the main figure, in cycles. A small baseline
 // makes the doubling visible from Mix alone; Detune widens the separation and (via
@@ -2469,31 +2617,90 @@ function applyDotDash(c, dl, lineWidth) {
   return arr;
 }
 
+// ── The phase lift: δ is an angle, not a deformation ──────────────────────────
+// Watch the figure under phase animation and it reads as a rigid 3D wire spinning
+// about a vertical axis rather than a flat curve writhing. That percept is exact.
+// The figure is x = ax·sin(fx·t + δπ), y = ay·sin(fy·t). Take the FIXED curve on a
+// cylinder of radius ax
+//     X = ax·sin(fx·t)    Y = ay·sin(fy·t)    Z = ax·cos(fx·t)
+// yaw it about the vertical by δπ and drop the depth coordinate:
+//     x' = X·cos δπ + Z·sin δπ = ax·sin(fx·t + δπ)     ← the figure, term for term
+//     y' = Y                                           ← the figure
+// So the δ slider IS the yaw angle and "Animate phase" IS a spin. Lift mode stops
+// discarding Z: it samples the quadrature wave into szArr and hands δ to the
+// rotation instead of to the sampler. The picture does not change — it just
+// becomes an object you can tilt.
+//
+// The honest caveat, kept here because the UI only has room for one line of it:
+// requiring W(θ+δ) = W(θ)·cos δ + W(θ+π/2)·sin δ for all θ, δ pins X and Z (set
+// δ=0, then δ=π/2), and the remaining functional equation admits ONLY sinusoids.
+// A phase shift moves harmonic n by n·δ, which no single rigid rotation can do.
+// So for triangle/saw/square, and under heavy FM/fold/sync, the lift is a close
+// relative of the flat figure rather than a theorem about it: still a coherent
+// solid that spins, no longer an identity. Sine gives you the identity.
+function liftActive() { return Math.round(params.depthSrc ?? 2) === 1; }
+
 // ── Shared figure transform (main view AND construction view) ─────────────────
-// z-oscillator depth → rotation about the chosen axis (Z in-plane / Y vertical /
-// X horizontal) → perspective → shear. Y/X-axis rotation implies depth even with
-// the z oscillator off, so a flat figure spins like a real 3D object.
+// depth (lift quadrature or z oscillator) → yaw about the chosen axis (Z in-plane
+// / Y vertical / X horizontal) → orbit tilt → perspective → shear. Y/X-axis yaw
+// implies depth even with the z oscillator off, so a flat figure spins like a
+// real 3D object.
 let rotSpin = false;            // animate rotation (checkbox); advanced in render()
 let rotSpinPhase = 0;           // accumulated spin, degrees
-const _xf = { z: false, zAmt: 0, rot: false, c: 1, s: 0, axis: 0, K: 0, sh: 0 };
-const _Q = { x: 0, y: 0 };      // figureXform output (normalized space)
-function beginFigureXform() {   // hoist per-frame constants out of the point loop
+const _xf = { z: false, zAmt: 0, rot: false, c: 1, s: 0, axis: 0, K: 0, sh: 0,
+              lift: false, tilt: false, tc: 1, ts: 0, tAxis: 0, zk: 1, flat: false };
+const _Q = { x: 0, y: 0, z: 0 };  // figureXform output (normalized space; z = view depth)
+// `phase` is δ in units of π — in lift mode it drives the yaw. `flat` strips the
+// tilt and the perspective, which is what makes the shadow pass an orthographic
+// projection and therefore exactly the 2D figure.
+function beginFigureXform(phase, flat, zk) {   // hoist per-frame constants out of the point loop
   _xf.zAmt = params.az || 0;
+  _xf.lift = liftActive();
+  _xf.flat = !!flat;
   _xf.z = _xf.zAmt > 0.001 && (params.fz || 0) > 0.01;
-  const a = (((params.rotateAngle || 0) + rotSpinPhase) % 360) * Math.PI / 180;
-  _xf.rot = Math.abs(a) > 1e-4;
+  // Lift mode adds δ·180° to the yaw. Rotate/spin stay live on top of it as a
+  // manual orbit offset, so dragging the view and animating the phase compose
+  // instead of fighting over the same angle.
+  const deg = (params.rotateAngle || 0) + rotSpinPhase + (_xf.lift ? (phase || 0) * 180 : 0);
+  const a = ((deg % 360) * Math.PI) / 180;
+  _xf.rot = _xf.lift || Math.abs(a) > 1e-4;
   _xf.c = Math.cos(a); _xf.s = Math.sin(a);
-  _xf.axis = Math.max(0, Math.min(2, Math.round(params.rotAxis || 0)));
+  // The lift yaws about the axis perpendicular to the phased one — normally the
+  // vertical, but visualSwap puts the phased axis on screen-Y, so it becomes X.
+  _xf.axis = _xf.lift ? (visualSwap ? 2 : 1)
+                      : Math.max(0, Math.min(2, Math.round(params.rotAxis || 0)));
+  const tilt = _xf.flat ? 0 : ((params.tiltAngle || 0) * Math.PI) / 180;
+  _xf.tilt = Math.abs(tilt) > 1e-4;
+  _xf.tc = Math.cos(tilt); _xf.ts = Math.sin(tilt);
+  // The orbit tilt has to turn about an axis PERPENDICULAR to the yaw, or it just
+  // adds to the spin and nothing tips. Normally the yaw is vertical, so the tilt is
+  // horizontal; visualSwap lays the cylinder on its side and the two exchange.
+  _xf.tAxis = (_xf.lift && visualSwap) ? 1 : 0;
+  // Depth rides the HORIZONTAL scale (rx), height rides the vertical one (ry), so
+  // any rotation mixing the two has to convert between them — otherwise a tilted
+  // figure shears the moment ax ≠ ay. (The pre-existing rotAxis = X path has always
+  // skipped this; correcting it there would change how saved presets look.)
+  _xf.zk = zk || 1;
   // Perspective strength: the z oscillator's depth, or an implied depth when
-  // rotating about Y/X so the rotation reads as 3D.
-  _xf.K = 0.45 * Math.max(_xf.zAmt, (_xf.rot && _xf.axis !== 0) ? 0.6 : 0);
+  // rotating about Y/X so the rotation reads as 3D. The lift takes NEITHER — it
+  // defaults to orthographic, because an orthographic projection is precisely
+  // what makes the picture the figure. `az` then dials perspective in by hand,
+  // and it costs you the identity knowingly rather than behind your back.
+  _xf.K = _xf.flat ? 0
+        : _xf.lift ? 0.45 * _xf.zAmt
+        : 0.45 * Math.max(_xf.zAmt, (_xf.rot && _xf.axis !== 0) ? 0.6 : 0);
   _xf.sh = params.shearAmt || 0;
 }
-function figureHasDepth() { return _xf.K > 0.001; }
-// px,py = raw sample amplitudes; zArg = the z oscillator's phase (fz·t) at this
-// point; zFlip mirrors the depth to render the figure's far ("back") face.
-function figureXform(px, py, zArg, zFlip) {
-  let z = _xf.z ? Math.sin(zArg) : 0;
+// The lift has genuine depth even with the perspective off, so the back face and
+// the depth cueing still apply — K alone would call an orthographic view flat.
+function figureHasDepth() { return _xf.K > 0.001 || _xf.lift; }
+// The z oscillator's contribution at phase zArg (fz·t). Lift mode ignores it: its
+// depth is a real sampled coordinate, not a third free-running oscillator.
+function figureZ(zArg) { return _xf.z ? Math.sin(zArg) : 0; }
+// px,py = raw sample amplitudes; z = this point's depth amplitude (the caller owns
+// where it came from); zFlip mirrors the depth to render the figure's far
+// ("back") face. Writes the view-space depth to _Q.z so the stroke can be shaded.
+function figureXform(px, py, z, zFlip) {
   if (zFlip) z = -z;
   if (_xf.rot) {
     const c = _xf.c, s = _xf.s;
@@ -2501,9 +2708,18 @@ function figureXform(px, py, zArg, zFlip) {
     else if (_xf.axis === 2) { const ny = py * c + z * s; z = -py * s + z * c; py = ny; } // X axis
     else                     { const nx = px * c - py * s; py = px * s + py * c; px = nx; } // Z: in-plane
   }
+  // Orbit elevation, applied AFTER the yaw so it tips the spin axis toward the
+  // viewer — the order a trackball implies. zk converts between the depth scale
+  // (rx) and the height scale (ry) on the way in and out, so the tilt stays
+  // uniform when ax ≠ ay instead of shearing the figure.
+  if (_xf.tilt) {
+    const c = _xf.tc, s = _xf.ts;
+    if (_xf.tAxis === 1) { const nx = px * c + z * s; z = -px * s + z * c; px = nx; }
+    else { const k = _xf.zk; const ny = py * c + z * k * s; z = -py * s / k + z * c; py = ny; }
+  }
   if (_xf.K > 0.001 && z !== 0) { const pf = 1 / Math.max(0.35, 1 + _xf.K * z); px *= pf; py *= pf; }
   if (Math.abs(_xf.sh) > 1e-3) px += _xf.sh * py;
-  _Q.x = px; _Q.y = py;
+  _Q.x = px; _Q.y = py; _Q.z = z;
 }
 
 // Trail persistence → background alpha. Cubed response so the low/mid slider
@@ -2619,7 +2835,11 @@ function eraseUnderFigure(target, phase, res, zoom, phaseBack) {
   const lwSave = params.lineWidth;
   params.lineWidth = lwSave * 1.35 + 0.7;
   target.globalCompositeOperation = 'destination-out';
+  // The clearance has to be fully opaque to actually clear, so the depth shading
+  // (and the shadow, which is not part of the stroke being cleared) stand down.
+  _eraseMode = true;
   drawFigureInto(target, phase, res, zoom, phaseBack);
+  _eraseMode = false;
   target.globalCompositeOperation = 'source-over';
   params.lineWidth = lwSave;
 }
@@ -2676,6 +2896,7 @@ function hexToRgba(hex, alpha) {
 const _S = { x: 0, y: 0 };   // scratch point for the construction-view strip mappers
 let mode4T = 0;
 let _m4MemoPhase = NaN, _m4MemoRes = -1;   // per-frame sample memo (see drawMode4)
+let _m4MemoLift = null;                    // ...and which depth mode built it
 // The tracer advances once per FRAME. drawMode4 runs several times per frame now
 // (figure, chrome, one pass per KEEP ghost), so it cannot own the clock.
 function advanceMode4() {
@@ -2683,6 +2904,7 @@ function advanceMode4() {
   mode4T = (mode4T + T * (params.traceSpeed ?? 1) * 0.003) % T;
 }
 let _m4BufX = new Float64Array(0), _m4BufY = new Float64Array(0);
+let _m4BufZ = new Float64Array(0);         // lift mode only: the quadrature (depth) sequence
 
 // part: M4_ALL draws everything; M4_FIGURE draws only the curve (untraced figure,
 // unison ghosts, traced arc) so it can be sent through the trail layer; M4_CHROME
@@ -2800,17 +3022,26 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
   // filter, so the construction view drifted from the real figure.
   const N = res + 1;
   if (_m4BufX.length < N) { _m4BufX = new Float64Array(N); _m4BufY = new Float64Array(N); }
-  const ampXArr = _m4BufX, ampYArr = _m4BufY;
+  const m4Lift = liftActive();
+  if (m4Lift && _m4BufZ.length < N) _m4BufZ = new Float64Array(N);
+  const ampXArr = _m4BufX, ampYArr = _m4BufY, ampZArr = _m4BufZ;
   // The figure pass and the chrome pass want the same samples. Memo them on the
   // phase they were built at, reset once per frame by render(), so drawing the
   // view in two passes costs one build rather than two — while a ghost at a
   // different phase still gets its own.
-  if (_m4MemoPhase !== phase || _m4MemoRes !== res) {
-    _m4MemoPhase = phase; _m4MemoRes = res;
+  const m4MemoPhase = m4Lift ? -1 : phase;   // lift mode: δ is a yaw, not a sample offset
+  if (_m4MemoPhase !== m4MemoPhase || _m4MemoRes !== res || _m4MemoLift !== m4Lift) {
+    _m4MemoPhase = m4MemoPhase; _m4MemoRes = res; _m4MemoLift = m4Lift;
     for (let i = 0; i <= res; i++) {
       const τ = (i / res) * T;
-      ampXArr[i] = processWave(fx * τ + phase * Math.PI, fx * τ, waveTypeX, 'x');
+      ampXArr[i] = processWave(fx * τ + (m4Lift ? 0 : phase * Math.PI), fx * τ, waveTypeX, 'x');
       ampYArr[i] = processWave(fy * τ, fy * τ, waveTypeY, 'y');
+    }
+    if (m4Lift) {
+      for (let i = 0; i <= res; i++) {
+        const τ = (i / res) * T;
+        ampZArr[i] = processWave(fx * τ + Math.PI / 2, fx * τ, waveTypeX, 'x');
+      }
     }
     const g = gcd(fx, fy);
     const cyclesX = fx / g, cyclesY = fy / g;   // waveform cycles within one period T
@@ -2820,6 +3051,7 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
       const wY = Math.PI * 2 * Math.min(0.49, (HC * cyclesY) / res);
       filterPeriodic(ampXArr, N, biquadCoeffs(filterType, wX, params.filterQ));
       filterPeriodic(ampYArr, N, biquadCoeffs(filterType, wY, params.filterQ));
+      if (m4Lift) filterPeriodic(ampZArr, N, biquadCoeffs(filterType, wX, params.filterQ));
     }
   }
   // X/Y swap mirrors the main view; sample the filtered arrays by time.
@@ -2829,6 +3061,10 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
   const idxAt = τ => { let k = Math.round((τ / T) * res) % res; return k < 0 ? k + res : k; };
   const hAt = τ => visualSwap ? ampYArr[idxAt(τ)] : ampXArr[idxAt(τ)];
   const vAt = τ => visualSwap ? ampXArr[idxAt(τ)] : ampYArr[idxAt(τ)];
+  // Depth always partners the X axis (the phased one), whichever way visualSwap
+  // has laid it on screen — so it is sampled at the X axis's own time.
+  const zAt = τ => ampZArr[idxAt(τ)];
+  const zTime = (τh, τv) => (visualSwap ? τv : τh);
 
   if (wantChrome) {
     // ── The horizontal generator: top strip
@@ -2858,7 +3094,7 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
   // ── Figure rendering — full visual pipeline (z / rotation axis / shear /
   // mirrors / fill / unison ghosts), matching the main view. The strips stay
   // raw waveforms; the figure box shows the transformed result.
-  beginFigureXform();
+  beginFigureXform(phase, false, rx / ry);
   const fzr = params.fz || 0;
   const m4Mirrors = figureMirrors();
   // Trace one full figure path under mirror signs mx/my. τOff shifts the HORIZONTAL
@@ -2869,7 +3105,7 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
     for (let i = 0; i <= res; i++) {
       const τ = (i / res) * T;
       let τh = τ + τOff; if (τh >= T) τh -= T;
-      figureXform(hAt(τh), vAt(τ), fzr * τ, zFlip);
+      figureXform(hAt(τh), vAt(τ), m4Lift ? zAt(zTime(τh, τ)) : figureZ(fzr * τ), zFlip);
       const xp = cx + rx * _Q.x * mx, yp = cy + ry * _Q.y * my;
       i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
     }
@@ -2911,7 +3147,7 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
   // ── Current positions (figure point runs through the same transform)
   const xAmpNow = hAt(t);
   const yAmpNow = vAt(t);
-  figureXform(xAmpNow, yAmpNow, fzr * t, false);
+  figureXform(xAmpNow, yAmpNow, m4Lift ? zAt(t) : figureZ(fzr * t), false);
   const figPx = cx + rx * _Q.x;
   const figPy = cy + ry * _Q.y;
   hPt(t, xAmpNow); const xDotX = _S.x, xDotY = _S.y;   // dot on the top strip
@@ -2936,7 +3172,7 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
       ctx.beginPath();
       for (let i = 0; i <= trailRes; i++) {
         const τ = (i / trailRes) * t;
-        figureXform(hAt(τ), vAt(τ), fzr * τ, false);
+        figureXform(hAt(τ), vAt(τ), m4Lift ? zAt(τ) : figureZ(fzr * τ), false);
         const xp = cx + rx * _Q.x * mx, yp = cy + ry * _Q.y * my;
         i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
       }
@@ -3345,6 +3581,53 @@ document.getElementById('btn-reset').addEventListener('click', resetAll);
 const figBox = { x: 0, y: 0, size: 700 };
 let viewW = 0, viewH = 0, viewDpr = 1;
 
+// ── Drag to orbit ─────────────────────────────────────────────────────────────
+// Live only under the phase lift, where the canvas is a view of an object rather
+// than a plot. Horizontal drag writes Rotate (the yaw the lift adds δ to, so the
+// animation keeps spinning underneath you), vertical drag writes Tilt. Both are
+// tracked from the value captured at pointerdown rather than accumulated per
+// event, which would drift over a long drag. Double-click resets the orbit.
+//
+// The canvas is position:fixed BEHIND .layout, which covers the window, so the
+// canvas never sees a pointer event — the listeners go on the document and a
+// drag is refused over the chrome instead. Move/up ride the window so a drag
+// that leaves the figure area still tracks.
+let orbitDrag = null;
+const ORBIT_CHROME = '.sidebar, header, .preset-sidebar, input, button, select, textarea, label, a';
+function orbitSet(key, id, value) {
+  params[key] = value;
+  const el = document.getElementById(id); if (el) el.value = value;
+  const d = document.getElementById(id + '-val'); if (d) d.textContent = Math.round(value) + '°';
+}
+function orbitEnd() {
+  if (!orbitDrag) return;
+  orbitDrag = null;
+  document.body.classList.remove('orbit-dragging');
+}
+document.addEventListener('pointerdown', e => {
+  if (!liftActive() || e.button !== 0) return;
+  if (e.target.closest && e.target.closest(ORBIT_CHROME)) return;
+  orbitDrag = { id: e.pointerId, x: e.clientX, y: e.clientY,
+                rot: params.rotateAngle || 0, tilt: params.tiltAngle || 0 };
+  document.body.classList.add('orbit-dragging');
+  e.preventDefault();
+});
+window.addEventListener('pointermove', e => {
+  if (!orbitDrag || e.pointerId !== orbitDrag.id) return;
+  const dx = e.clientX - orbitDrag.x, dy = e.clientY - orbitDrag.y;
+  let rot = (orbitDrag.rot + dx * 0.5) % 360; if (rot < 0) rot += 360;   // 720px = a full turn
+  orbitSet('rotateAngle', 'rotate-angle', rot);
+  orbitSet('tiltAngle', 'tilt-angle', Math.max(-89, Math.min(89, orbitDrag.tilt + dy * 0.4)));
+  e.preventDefault();
+});
+['pointerup', 'pointercancel'].forEach(ev => window.addEventListener(ev, orbitEnd));
+document.addEventListener('dblclick', e => {
+  if (!liftActive()) return;
+  if (e.target.closest && e.target.closest(ORBIT_CHROME)) return;
+  orbitSet('rotateAngle', 'rotate-angle', 0);
+  orbitSet('tiltAngle', 'tilt-angle', 0);
+});
+
 function resize() {
   const dpr = window.devicePixelRatio || 1;
   const W = Math.max(1, Math.floor(window.innerWidth));
@@ -3581,6 +3864,7 @@ const VEL_RANGES = {
   lineWidth: [0.5, 8],
   dotsLine:  [0, 1],
   rotateAngle: [0, 360],
+  tiltAngle: [-89, 89],
   shearAmt:  [-1, 1],
   trailAmt:  [0, 0.97],
   fz:        [0, 8],
@@ -3615,6 +3899,7 @@ const PARAM_UI = {
   filterCutoff: { slider: 'filter-freq', disp: 'filter-freq-val', fmt: v => fmtCutoff(v) },
   filterQ:   { slider: 'filter-res', disp: 'filter-res-val', fmt: v => v.toFixed(1) },
   dotsLine:  { slider: 'dots-line',  disp: 'dots-line-val',  fmt: fmtDotSpacing },
+  tiltAngle: { slider: 'tilt-angle', disp: 'tilt-angle-val', fmt: v => Math.round(v) + '°' },
   traceSpeed:    { slider: 'trace-speed',    disp: 'trace-speed-val',    fmt: v => v.toFixed(1) + '×' },
   untracedAlpha: { slider: 'untraced-alpha', disp: 'untraced-alpha-val', fmt: v => Math.round(v*100) + '%' },
   shapeAmt:  { slider: 'shape-amt',  disp: 'shape-amt-val',  fmt: v => v.toFixed(2) },
@@ -4387,6 +4672,7 @@ const VISUAL_SLIDERS = [
   ['trail-amt',    'trailAmt',    fmtTrail],
   ['fz',           'fz',          fmtZ],
   ['az',           'az',          v => Math.round(v * 100) + '%'],
+  ['tilt-angle',   'tiltAngle',   fmtDeg],
 ];
 VISUAL_SLIDERS.forEach(([id, key, fmt]) => {
   document.getElementById(id).addEventListener('input', e => {
@@ -4447,6 +4733,46 @@ document.querySelectorAll('.wave-btn[data-rotaxis]').forEach(btn => {
 });
 
 document.getElementById('rotate-spin').addEventListener('change', e => { rotSpin = e.target.checked; });
+
+// Depth source: flat / phase lift / z oscillator. The lift makes δ a rotation
+// angle rather than a waveform offset, so the panel relabels itself around it —
+// `az` stops being a depth amount and becomes the perspective control, δ stops
+// being a position and becomes an angle, and the Z ratio has nothing to drive.
+function setDepthSrc(n) {
+  n = Math.max(0, Math.min(2, Math.round(n)));
+  const changed = params.depthSrc !== n;
+  params.depthSrc = n;
+  document.querySelectorAll('.wave-btn[data-depthsrc]').forEach(b => {
+    const active = parseInt(b.dataset.depthsrc) === n;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  const lift = n === 1;
+  const dim = (id, off) => { const e = document.getElementById(id); if (e) e.style.opacity = off ? 0.4 : 1; };
+  dim('fz-row', n !== 2);
+  const fzEl = document.getElementById('fz'); if (fzEl) fzEl.disabled = (n !== 2);
+  ['depth-shade', 'show-shadow'].forEach(id => {
+    const cb = document.getElementById(id);
+    if (!cb) return;
+    cb.disabled = !lift;
+    if (cb.parentElement) cb.parentElement.style.opacity = lift ? 1 : 0.4;
+  });
+  const azLbl = document.getElementById('az-label');
+  if (azLbl) azLbl.textContent = lift ? 'Perspective' : 'Depth';
+  const phLbl = document.getElementById('phase-label');
+  if (phLbl) phLbl.textContent = lift ? 'δ (rotation angle)' : 'δ (phase position)';
+  // δ no longer reaches the sampler in lift mode, so there is no phase offset for
+  // the modulators to inherit — say so rather than leaving a dead checkbox.
+  const pm = document.getElementById('phase-modulators');
+  if (pm) { pm.disabled = lift; if (pm.parentElement) pm.parentElement.style.opacity = lift ? 0.4 : 1; }
+  document.body.classList.toggle('orbit', lift);
+  if (changed) clearTrail();
+}
+document.querySelectorAll('.wave-btn[data-depthsrc]').forEach(btn => {
+  btn.addEventListener('click', () => setDepthSrc(parseInt(btn.dataset.depthsrc)));
+});
+document.getElementById('depth-shade').addEventListener('change', e => { params.depthShade = e.target.checked ? 1 : 0; });
+document.getElementById('show-shadow').addEventListener('change', e => { params.showShadow = e.target.checked ? 1 : 0; });
 function setM4Rotate(on) {
   params.m4Rotate = on ? 1 : 0;
   document.querySelectorAll('.wave-btn[data-m4rot]').forEach(b => {
@@ -5036,6 +5362,10 @@ const MAP_TARGETS = {
   trailMode:{ label:'Trail Mode',     min:0,    max:1,   step:1,    apply:v => setTrailMode(v) },
   trailCount:{ label:'Trail Count',   min:0,    max:16,  step:1,    apply:v => setSliderParam('trailCount','trail-count','trail-count-val',x=>String(Math.round(x)),v) },
   trailSpacing:{ label:'Trail Spacing', min:0.005, max:0.5,        apply:v => setSliderParam('trailSpacing','trail-spacing','trail-spacing-val',x=>x.toFixed(3)+'π',v) },
+  depthSrc:  { label:'Depth Source',   min:0,    max:2,   step:1,    apply:v => setDepthSrc(v) },
+  tiltAngle: { label:'Orbit Tilt',     min:-89,  max:89,             apply:v => setSliderParam('tiltAngle','tilt-angle','tilt-angle-val',x=>Math.round(x)+'°',v) },
+  depthShade:{ label:'Depth Shading', toggle:true, apply:b => { params.depthShade = b ? 1 : 0; const cb=document.getElementById('depth-shade'); if (cb) cb.checked = b; } },
+  showShadow:{ label:'Flat Shadow',   toggle:true, apply:b => { params.showShadow = b ? 1 : 0; const cb=document.getElementById('show-shadow'); if (cb) cb.checked = b; } },
   fz:        { label:'Z Ratio',       min:0,    max:8,   step:0.5,  apply:v => setSliderParam('fz','fz','fz-val',x=>(x<0.01?'off':(Number.isInteger(x)?x:x.toFixed(1))),v) },
   az:        { label:'Z Depth',       min:0,    max:1,              apply:v => setSliderParam('az','az','az-val',x=>Math.round(x*100)+'%',v) },
   waveX:     { label:'X Wave Cycle',  min:0,    max:3,   step:1,    apply:v => setBaseWave('x', WAVES[Math.max(0,Math.min(3,Math.round(v)))]) },
@@ -5599,6 +5929,9 @@ function refreshAllControls() {
   setTrailMode(params.trailMode ?? 0);
   TRAIL_KEEP_SLIDERS.forEach(([id, key, fmt]) => setS(id, params[key] ?? 0, id + '-val', fmt));
   setRotAxis(params.rotAxis ?? 0);
+  setDepthSrc(params.depthSrc ?? 2);
+  document.getElementById('depth-shade').checked = !!params.depthShade;
+  document.getElementById('show-shadow').checked = !!params.showShadow;
   document.getElementById('rotate-spin').checked = rotSpin;
   setM4Rotate(!!params.m4Rotate);
   document.getElementById('fill-surface').checked = !!params.fillSurface;
@@ -5851,6 +6184,7 @@ document.addEventListener('dblclick', e => {
 const EVOLVE_KEYS = Object.keys(MAP_TARGETS).filter(k => k !== 'preset');
 // Default-excluded: view toggles + master volume (disruptive / non-musical).
 const EVOLVE_DEFAULT_OFF = new Set(['constructionView', 'animatePhase', 'visualSwap', 'volume', 'rotSpin',
+  'depthSrc', 'depthShade', 'showShadow',
                                     'm4Rotate', 'trailMode']);
 const evolveInclude = {};
 EVOLVE_KEYS.forEach(k => { evolveInclude[k] = !EVOLVE_DEFAULT_OFF.has(k); });
@@ -6053,7 +6387,8 @@ let _morph = null;
 // is meaningless (ratios would explode the figure's period mid-glide).
 // 'phase' is excluded entirely (never recalled — see applyPresetData) so the
 // running animation stays continuous across a preset change.
-const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'trailMode', 'trailCount', 'm4Rotate', 'phase']);
+const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'trailMode', 'trailCount', 'm4Rotate', 'phase',
+                                'depthSrc', 'depthShade', 'showShadow']);
 function lerpHex(a, b, u) {
   const pa = a.replace('#',''), pb = b.replace('#','');
   const c = i => Math.round(parseInt(pa.slice(i,i+2),16) + (parseInt(pb.slice(i,i+2),16) - parseInt(pa.slice(i,i+2),16)) * u);
