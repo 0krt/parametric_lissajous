@@ -16,6 +16,7 @@
     --panel: #111115;
     --border: #222228;
     --accent: #c8f060;
+    --accent-hi: #dbff7d;      /* hover brightening for an already-active switch */
     --accent2: #60b0f0;
     --text: #d4d4d8;
     --label: #a1a1aa;
@@ -299,7 +300,7 @@
     text-align: center;
   }
 
-  .wave-btn:hover { color: var(--text); }
+  .wave-btn:not(.active):hover { color: var(--text); }
 
   .wave-btn.active {
     background: var(--accent);
@@ -493,7 +494,7 @@
     white-space: nowrap;
   }
 
-  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .preset-btn:not(.active):hover { border-color: var(--accent); color: var(--accent); }
   .preset-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(200,240,96,0.07); }
   .divider { border: none; border-top: 1px solid var(--border); }
 
@@ -589,7 +590,7 @@
     transition: all 0.12s;
     text-align: center;
   }
-  .lfo-wave-btn:hover { color: var(--text); border-color: var(--muted); }
+  .lfo-wave-btn:not(.active):hover { color: var(--text); border-color: var(--muted); }
   .lfo-wave-btn.active { background: rgba(96,176,240,0.15); border-color: var(--accent2); color: var(--accent2); }
 
   /* Modulator (FM/AM) waveform selector — same look as the LFO wave buttons */
@@ -607,7 +608,7 @@
     transition: all 0.12s;
     text-align: center;
   }
-  .mod-wave-btn:hover { color: var(--text); border-color: var(--muted); }
+  .mod-wave-btn:not(.active):hover { color: var(--text); border-color: var(--muted); }
   .mod-wave-btn.active { background: rgba(96,176,240,0.15); border-color: var(--accent2); color: var(--accent2); }
 
   /* FM/AM axis targeting (both / X only / Y only) — same look, spaced off the
@@ -627,7 +628,7 @@
     transition: all 0.12s;
     text-align: center;
   }
-  .mod-axis-btn:hover { color: var(--text); border-color: var(--muted); }
+  .mod-axis-btn:not(.active):hover { color: var(--text); border-color: var(--muted); }
   .mod-axis-btn.active { background: rgba(96,176,240,0.15); border-color: var(--accent2); color: var(--accent2); }
   .retrig-btn {
     background: none;
@@ -969,8 +970,14 @@
     flex-shrink: 0;
   }
   .preset-sidebar-head .section-label { margin-bottom: 10px; }
-  .grid-mode-row { display: flex; gap: 4px; margin-bottom: 8px; }
-  .grid-mode-row .wave-btn { flex: 1; }
+  /* A pad flashes once when shift-click stores into it — the only feedback that
+     an overwrite happened, now that there is no STORE mode light. */
+  @keyframes grid-pad-stored {
+    0%   { box-shadow: 0 0 0 3px var(--accent) inset; }
+    100% { box-shadow: 0 0 0 0   var(--accent) inset; }
+  }
+  .grid-pad.stored { animation: grid-pad-stored 0.4s ease-out; }
+  @media (prefers-reduced-motion: reduce) { .grid-pad.stored { animation: none; } }
   .grid-meta-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
   .grid-meta-row .map-add-btn { flex: 1; }
   .grid-hint { font-size: 11px; color: var(--muted); line-height: 1.55; }
@@ -1003,7 +1010,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .grid-pad:hover { border-color: var(--muted); color: var(--text); }
+  .grid-pad:not(.filled):hover { border-color: var(--muted); color: var(--text); }
   .grid-pad.filled { color: #0c0c0e; font-weight: 600; }
   .grid-pad.active { box-shadow: 0 0 0 2px var(--accent) inset; }
   .grid-pad.unaddressable { opacity: 0.85; }
@@ -1274,7 +1281,16 @@
   /* ── Inactive toggle buttons were --muted on --bg with no border, which read
      as disabled. Give them the body text colour and a visible edge. ──────── */
   .wave-btn { color: var(--label); }
-  .wave-btn:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  .wave-btn:not(.active):hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+  /* An ACTIVE switch brightens on hover — it must never dim towards the
+     inactive skin, which read as "this just turned itself off". */
+  .wave-btn.active:hover { background: var(--accent-hi); color: #0c0c0e; }
+  .lfo-wave-btn.active:hover, .mod-wave-btn.active:hover, .mod-axis-btn.active:hover {
+    background: rgba(96,176,240,0.28); border-color: var(--accent2); color: var(--accent2);
+  }
+  .preset-btn.active:hover { border-color: var(--accent-hi); color: var(--accent-hi); background: rgba(200,240,96,0.14); }
+  .grid-pad.filled:hover { filter: brightness(1.18); }
   .lfo-wave-btn, .mod-wave-btn, .retrig-btn, .map-cc-btn, .preset-btn,
   .map-add-btn, .sidebar-toggle, .grid-toggle { color: var(--label); }
 
@@ -1394,6 +1410,10 @@
           <button class="wave-btn" data-axis="x" data-bwave="sawtooth">SAW</button>
           <button class="wave-btn" data-axis="x" data-bwave="square">SQR</button>
         </div>
+        <div class="param-row" style="margin-top:5px">
+          <div class="param-header"><label>Morph</label><span class="val" id="morph-x-val">off</span></div>
+          <input type="range" id="morph-x" min="0" max="1" step="0.01" value="0">
+        </div>
       </div>
       <div class="param-row" style="margin-bottom:6px">
         <div class="param-header"><label>Y wave</label></div>
@@ -1402,6 +1422,18 @@
           <button class="wave-btn" data-axis="y" data-bwave="triangle">TRI</button>
           <button class="wave-btn" data-axis="y" data-bwave="sawtooth">SAW</button>
           <button class="wave-btn" data-axis="y" data-bwave="square">SQR</button>
+        </div>
+        <div class="param-row" style="margin-top:5px">
+          <div class="param-header"><label>Morph</label><span class="val" id="morph-y-val">off</span></div>
+          <input type="range" id="morph-y" min="0" max="1" step="0.01" value="0">
+        </div>
+        <div class="info-text" data-info-label="the waveform morph">
+          The four buttons pick an exact shape; <strong>Morph</strong> crossfades
+          that shape into the next one along the cycle
+          (SIN → TRI → SAW → SQR → SIN), so every pair of neighbours is reachable
+          continuously and the whole chain is reachable by choosing a different
+          starting shape. At 0 the wave is exactly the one the button names, so
+          nothing moves until you ask it to.
         </div>
       </div>
       <canvas class="wave-preview" id="wave-preview" width="208" height="28"></canvas>
@@ -1486,14 +1518,33 @@
       </div>
 
       <div class="mod-group">
-        <div class="vel-row"><span class="vel-label">Drive (fold)</span></div>
+        <div class="vel-row"><span class="vel-label">Warp &amp; Fold</span></div>
         <div class="param-row">
-          <div class="param-header"><label>Amount</label><span class="val" id="fold-drive-val">1.0</span></div>
+          <div class="param-header"><label>Warp</label><span class="val" id="warp-val">0.0 %</span></div>
+          <input type="range" id="warp" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="param-row">
+          <div class="param-header"><label>Fold</label><span class="val" id="fold-drive-val">0 %</span></div>
           <input type="range" id="fold-drive" min="1" max="8" step="0.1" value="1">
         </div>
         <div class="param-row">
           <div class="param-header"><label>Bias</label><span class="val" id="fold-bias-val">0.00</span></div>
           <input type="range" id="fold-bias" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="info-text" data-info-label="warp and fold">
+          The two shapers from Ableton Wavetable's oscillator.
+          <strong>Warp</strong> bends the cycle's own clock rather than its
+          amplitude: at <em>+100%</em> the entire cycle is crammed into its opening
+          and the rest of the period is a flat tail; at <em>−100%</em> it lies flat
+          and then fires off at the very end. Both ends of the cycle are fixed
+          points of the bend, so the wave stays periodic and continuous at any
+          setting — on a square it reads as PWM, on a saw as a bent ramp.
+          <strong>Fold</strong> drives the wave into a reflecting folder: past ±1 the
+          signal turns back on itself instead of clipping, so each extra decibel of
+          drive buys another lobe per cycle and the harmonics grow without the
+          shape ever leaving the rails. <strong>Bias</strong> offsets the signal into
+          the folder, so the two halves fold differently and the result loses its
+          symmetry (and gains even harmonics).
         </div>
       </div>
 
@@ -1573,7 +1624,7 @@
     </div>
 
     <div class="section" id="section-axes">
-      <div class="section-label">Frequencies</div>
+      <div class="section-label">Frequency and MIDI</div>
       <div class="mod-group">
         <div class="vel-row"><span class="vel-label">X Axis</span></div>
         <div class="param-row">
@@ -1811,17 +1862,14 @@
         <button class="wave-btn" data-aspect="16:9">16:9</button>
         <button class="wave-btn" data-aspect="9:16">9:16</button>
       </div>
-      <div class="param-row">
-        <div class="param-header"><label>Zoom</label><span class="val" id="rec-zoom-val">1.00×</span></div>
-        <input type="range" id="rec-zoom" min="0.6" max="4" step="0.01" value="1">
-      </div>
       <div class="checkbox-row">
         <input type="checkbox" id="rec-show-frame">
         <label for="rec-show-frame">Show frame preview</label>
       </div>
       <div class="info-text" data-info-label="video recording">
         Recording captures exactly what the canvas shows — construction view included
-        when it's on.
+        when it's on. The framing's <strong>Zoom</strong> now lives with the rest of
+        the figure's view controls, under <em>Figure ▸ View</em>.
       </div>
       <button class="map-add-btn" id="rec-toggle" style="margin-top:8px">● record</button>
       <div id="rec-status" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5" role="status"></div>
@@ -1829,6 +1877,20 @@
 
     <div class="section" id="section-render">
       <div class="section-label">Figure</div>
+
+      <div class="subsection-label">View</div>
+      <div class="param-row">
+        <div class="param-header"><label>Zoom</label><span class="val" id="rec-zoom-val">1.00×</span></div>
+        <input type="range" id="rec-zoom" min="0.1" max="4" step="0.01" value="1">
+      </div>
+      <div class="info-text" data-info-label="zoom">
+        Scales the figure inside its frame, on screen and in a recording alike.
+        You can also <strong>pinch with two fingers</strong> or hold
+        <strong>Shift</strong> (or ⌘/Ctrl) and scroll anywhere over the figure.
+      </div>
+      <div class="number-input"><label>Resolution</label><input type="number" id="resolution" value="2000" min="100" max="10000" step="100"></div>
+
+      <div class="subsection-label">Colour</div>
       <div class="color-row"><label>Stroke</label><input type="color" id="stroke-color" value="#c8f060"></div>
       <div class="param-row hsl-row">
         <div class="param-header"><label>Hue</label><span class="val" id="hsl-h-val">79</span></div>
@@ -1843,6 +1905,8 @@
         <input type="range" id="hsl-l" min="0" max="100" step="1" value="66">
       </div>
       <div class="color-row"><label>Background</label><input type="color" id="bg-color" value="#0c0c0e"></div>
+
+      <div class="subsection-label">Stroke</div>
       <div class="param-row">
         <div class="param-header"><label>Line width</label><span class="val" id="line-width-val">1.5</span></div>
         <input type="range" id="line-width" min="0.5" max="8" step="0.1" value="1.5">
@@ -1851,6 +1915,8 @@
         <div class="param-header"><label>Dots ↔ Line</label><span class="val" id="dots-line-val">line</span></div>
         <input type="range" id="dots-line" min="0" max="1" step="0.01" value="1">
       </div>
+
+      <div class="subsection-label">Transform</div>
       <div class="param-row">
         <div class="param-header"><label>Rotate</label><span class="val" id="rotate-angle-val">0°</span></div>
         <input type="range" id="rotate-angle" min="0" max="360" step="1" value="0">
@@ -1869,7 +1935,21 @@
         <div class="param-header"><label>Shear</label><span class="val" id="shear-amt-val">0.00</span></div>
         <input type="range" id="shear-amt" min="-1" max="1" step="0.01" value="0">
       </div>
-      <div class="param-header" style="margin-bottom:4px"><label>Trail</label></div>
+
+      <div class="subsection-label">Symmetry</div>
+      <div class="param-header" style="margin-bottom:4px"><label>Mirror</label></div>
+      <div class="wave-toggle" style="margin-bottom:8px">
+        <button class="wave-btn active" data-mirror="0">OFF</button>
+        <button class="wave-btn" data-mirror="1">X</button>
+        <button class="wave-btn" data-mirror="2">Y</button>
+        <button class="wave-btn" data-mirror="3">X+Y</button>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="fill-surface">
+        <label for="fill-surface">Fill surface (front &amp; back)</label>
+      </div>
+
+      <div class="subsection-label">Trail</div>
       <div class="wave-toggle" style="margin-bottom:6px">
         <button class="wave-btn active" data-trailmode="0">FADE</button>
         <button class="wave-btn" data-trailmode="1">KEEP</button>
@@ -1898,28 +1978,13 @@
         way to it. Either way the trail applies to the figure alone; the
         construction view's strips, rulers and dots are redrawn clean every frame.
       </div>
-      <div class="param-header" style="margin-bottom:4px"><label>Mirror</label></div>
-      <div class="wave-toggle" style="margin-bottom:8px">
-        <button class="wave-btn active" data-mirror="0">OFF</button>
-        <button class="wave-btn" data-mirror="1">X</button>
-        <button class="wave-btn" data-mirror="2">Y</button>
-        <button class="wave-btn" data-mirror="3">X+Y</button>
-      </div>
-      <div class="checkbox-row">
-        <input type="checkbox" id="fill-surface">
-        <label for="fill-surface">Fill surface (front &amp; back)</label>
-      </div>
+
       <div class="mod-group">
         <div class="vel-row"><span class="vel-label">3D depth</span></div>
         <div class="param-header" style="margin-bottom:4px"><label>Depth source</label></div>
         <div class="wave-toggle" style="margin-bottom:6px">
-          <button class="wave-btn" data-depthsrc="0" aria-pressed="false">FLAT</button>
+          <button class="wave-btn active" data-depthsrc="0" aria-pressed="true">FLAT</button>
           <button class="wave-btn" data-depthsrc="1" aria-pressed="false">PHASE LIFT</button>
-          <button class="wave-btn active" data-depthsrc="2" aria-pressed="true">Z OSC</button>
-        </div>
-        <div class="param-row" id="fz-row">
-          <div class="param-header"><label>Z ratio</label><span class="val" id="fz-val">off</span></div>
-          <input type="range" id="fz" min="0" max="8" step="0.5" value="0">
         </div>
         <div class="param-row">
           <div class="param-header"><label id="az-label">Depth</label><span class="val" id="az-val">0%</span></div>
@@ -1961,11 +2026,27 @@
           modulators</em> has nothing to act on.
         </div>
       </div>
-      <div class="number-input"><label>Resolution</label><input type="number" id="resolution" value="2000" min="100" max="10000" step="100"></div>
 
-      <div class="param-row" style="margin-top:12px">
+      <div class="subsection-label">Motion</div>
+      <div class="param-row">
         <div class="param-header"><label id="phase-label">δ (phase position)</label><span class="val" id="phase-val">0.50π</span></div>
         <input type="range" id="phase" min="0" max="2" step="0.01" value="0.5">
+      </div>
+      <div class="param-row">
+        <div class="param-header"><label>δʏ (Y phase offset)</label><span class="val" id="phase-y-val">0.00π</span></div>
+        <input type="range" id="phase-y" min="0" max="2" step="0.01" value="0">
+      </div>
+      <div class="info-text" data-info-label="the Y phase offset">
+        δ offsets the <em>X</em> carrier only; animating it is what turns the figure.
+        δʏ is the same offset on <em>Y</em>, and it is not redundant: with equal
+        frequencies the two together choose <em>which</em> member of the family you
+        are looking at while the animation still runs, and with unequal frequencies
+        δʏ selects a different figure of the same ratio rather than a rotation of
+        the same one — a ratio's whole family becomes reachable while δ keeps
+        moving. It stays put while δ animates, so it is the shape control and δ is
+        the motion. Under <strong>PHASE LIFT</strong> δ becomes a rotation angle and
+        leaves the waveform alone, so δʏ is then the only phase offset still
+        reaching the sampler — it warps the lifted object itself.
       </div>
       <div class="checkbox-row">
         <input type="checkbox" id="phase-modulators">
@@ -1979,6 +2060,8 @@
         <div class="param-header"><label>Speed</label><span class="val" id="speed-val">1.0×</span></div>
         <input type="range" id="anim-speed" min="0.1" max="5" step="0.1" value="1">
       </div>
+
+      <div class="subsection-label">Construction view</div>
       <div class="checkbox-row" style="margin-top:6px">
         <input type="checkbox" id="construction-view" checked>
         <label for="construction-view">Construction view</label>
@@ -2070,10 +2153,6 @@
   <div class="preset-sidebar" id="preset-sidebar">
     <div class="preset-sidebar-head">
       <div class="section-label" style="cursor:default">Session Presets</div>
-      <div class="grid-mode-row">
-        <button class="wave-btn active" id="grid-mode-load">LOAD</button>
-        <button class="wave-btn" id="grid-mode-store">STORE</button>
-      </div>
       <div class="grid-meta-row">
         <label style="font-size:11px;letter-spacing:0.08em;color:var(--muted)">MIDI ch</label>
         <select class="midi-select" id="grid-channel" style="width:auto;flex:1"></select>
@@ -2082,11 +2161,35 @@
         <div class="param-header"><label>Morph</label><span class="val" id="grid-morph-val">instant</span></div>
         <input type="range" id="grid-morph" min="0" max="10" step="0.1" value="0">
       </div>
+      <div class="param-header" style="margin-bottom:4px"><label>Stepped parameters</label></div>
+      <div class="wave-toggle" style="margin-bottom:6px">
+        <button class="wave-btn" data-morphstep="start" title="Step them the moment the pad is hit">START</button>
+        <button class="wave-btn active" data-morphstep="end" title="Step them as the morph lands">END</button>
+        <button class="wave-btn" data-morphstep="ignore" title="Never step them — recall only what can be interpolated">IGNORE</button>
+      </div>
+      <div class="info-text" data-info-label="stepped parameters during a morph">
+        A morph glides everything that has an in-between. The rest — frequency
+        ratios, waveforms, mirror and trail modes, the filter type, the view
+        toggles — has none, so it has to step, and this says when.
+        <strong>START</strong> steps it the moment the pad is hit, so the new
+        patch's structure is there from the first frame and the glide fills in the
+        rest around it. <strong>END</strong> holds the current structure for the
+        whole glide and steps it as the morph lands. <strong>IGNORE</strong> never
+        steps it at all: the stepped parameters stay exactly as you have them and
+        only the continuous ones are recalled, which is how you audition a patch's
+        timbre against your own ratio (it applies to instant loads too).
+      </div>
       <div class="grid-meta-row">
         <button class="map-add-btn" id="grid-export" style="margin-top:0">⤓ export</button>
         <button class="map-add-btn" id="grid-import" style="margin-top:0">⤒ import</button>
       </div>
-      <div class="info-text" id="grid-hint" data-info-label="the preset pads">Pads play from <strong>C1</strong>. STORE-click saves the current patch; right-click clears.</div>
+      <div class="info-text" id="grid-hint" data-info-label="the preset pads">
+        <strong>Click</strong> loads a pad, <strong>Shift-click</strong> saves the
+        current patch into it, <strong>right-click</strong> clears it. Pads play
+        from <strong>C1</strong> over MIDI, and the number keys
+        <strong>1</strong>–<strong>9</strong> fire the first nine (except while
+        you're typing in a field).
+      </div>
       <input type="file" id="grid-file" accept="application/json,.json" style="display:none">
     </div>
     <div class="preset-pad-grid" id="preset-pad-grid"></div>
@@ -2113,6 +2216,9 @@ let params = {
   ax: 1, fx: 3,
   ay: 1, fy: 2,
   phase: 0.5,
+  phaseY: 0,      // static phase offset on the Y carrier, in π (X's δ is `phase`)
+  morphX: 0,      // X base wave morph towards the next waveform in the cycle (0..1)
+  morphY: 0,      // Y base wave morph towards the next waveform in the cycle (0..1)
   strokeColor: '#c8f060',
   bgColor: '#0c0c0e',
   lineWidth: 1.5,
@@ -2121,6 +2227,7 @@ let params = {
   fmRatio: 2,     // frequency modulation ratio
   fmWave: 'sine', // FM modulator waveform
   fmAxis: 0,      // which axis FM is applied to: 0 = both, 1 = X only, 2 = Y only
+  warp: 0,        // phase bend (Ableton Wavetable "Warp"): -1 = late, +1 = early
   shapeAmt: 0,    // waveshaping (tanh) drive
   syncAmt: 1,     // sync ratio (1 = off), range 0.1..2.0
   foldDrive: 1,
@@ -2149,9 +2256,8 @@ let params = {
   trailCount: 4,   // KEEP: how many copies of the figure trail behind it
   trailSpacing: 0.08, // KEEP: phase distance between copies, in π
   mirrorMode: 0,   // 0 = off, 1 = mirror X, 2 = mirror Y, 3 = 4-fold kaleidoscope
-  fz: 0,           // z-axis (depth) frequency ratio; 0 = 2D (visual)
-  az: 0,           // z-axis depth amount 0..1 — perspective scaling (visual)
-  depthSrc: 2,     // depth source: 0 = flat, 1 = phase lift (δ becomes rotation), 2 = z oscillator
+  az: 0,           // depth amount 0..1 — perspective scaling (visual)
+  depthSrc: 0,     // depth source: 0 = flat, 1 = phase lift (δ becomes rotation)
   tiltAngle: 0,    // orbit elevation, degrees: tips the spin axis toward the viewer (visual)
   depthShade: 1,   // 1 = depth-cue the stroke (far = dimmer + thinner), drawn back-to-front
   showShadow: 0,   // 1 = also draw the flat orthographic projection the lifted figure casts
@@ -2175,7 +2281,20 @@ let phaseModulators = false;           // phase rotation also offsets FM/AM modu
 // axis's own waveform, so the effect is consistent across all three.
 const FILTER_MAX_HARMONICS = 256;
 function filterHarmonics() { return Math.pow(FILTER_MAX_HARMONICS, params.filterCutoff); } // 1..256
-function filterIsOn() { return params.filterCutoff < 0.999; }
+// Approaching "open" used to be a cliff: at 0.999 the cutoff still sat on the top
+// harmonic with the resonant peak riding it (and for HP/BP/notch that position
+// gutted the signal), then one step later the stage was bypassed outright. The
+// wet mix now tapers to zero over the last stretch of the slider, so the last
+// step onto "open" changes nothing — the filter is already fully dry by then.
+const FILTER_TAPER_LO = 0.86;
+function filterMix() {
+  const c = params.filterCutoff;
+  if (c <= FILTER_TAPER_LO) return 1;
+  if (c >= 1) return 0;
+  const u = (1 - c) / (1 - FILTER_TAPER_LO);
+  return u * u * (3 - 2 * u);   // smoothstep — no kink where the taper starts
+}
+function filterIsOn() { return filterMix() > 0.0015; }
 // RBJ biquad coefficients (normalised, a0 folded in). w0 = 2π·Fc/Fs.
 function biquadCoeffs(type, w0, Q) {
   w0 = Math.max(1e-4, Math.min(Math.PI * 0.99, w0));
@@ -2189,10 +2308,11 @@ function biquadCoeffs(type, w0, Q) {
 }
 // In-place biquad over a periodic sequence: pass 1 settles state across the loop
 // point, pass 2 writes the steady-state output.
-function filterPeriodic(arr, n, c) {
+function filterPeriodic(arr, n, c, mix) {
+  mix = mix === undefined ? filterMix() : mix;
   let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
   for (let i = 0; i < n; i++) { const x0 = arr[i]; const y0 = c.b0*x0 + c.b1*x1 + c.b2*x2 - c.a1*y1 - c.a2*y2; x2 = x1; x1 = x0; y2 = y1; y1 = y0; }
-  for (let i = 0; i < n; i++) { const x0 = arr[i]; const y0 = c.b0*x0 + c.b1*x1 + c.b2*x2 - c.a1*y1 - c.a2*y2; x2 = x1; x1 = x0; y2 = y1; y1 = y0; arr[i] = y0; }
+  for (let i = 0; i < n; i++) { const x0 = arr[i]; const y0 = c.b0*x0 + c.b1*x1 + c.b2*x2 - c.a1*y1 - c.a2*y2; x2 = x1; x1 = x0; y2 = y1; y1 = y0; arr[i] = x0 + (y0 - x0) * mix; }
 }
 // Reusable buffers for the figure's per-axis sample sequences.
 let _figBufX = new Float64Array(0), _figBufY = new Float64Array(0);
@@ -2205,7 +2325,10 @@ let animSpeed = 1;
 let animPhase = 0;
 let raf;
 
-// Wave functions
+// Wave functions. WAVE_ORDER is the morph cycle: each base wave morphs into the
+// one after it (square wraps back to sine), so the Morph slider covers every
+// adjacent pair without giving up the four exact shapes the buttons select.
+const WAVE_ORDER = ['sine', 'triangle', 'sawtooth', 'square'];
 function waveFn(t, type) {
   switch (type) {
     case 'sine': return Math.sin(t);
@@ -2226,6 +2349,33 @@ function waveFn(t, type) {
   }
 }
 
+// Morphed base wave: a straight crossfade from the selected shape to the next
+// one in WAVE_ORDER. At morph 0 this is exactly waveFn, so nothing that predates
+// the control changes.
+function morphWaveFn(t, type, morph) {
+  if (!(morph > 0.0005)) return waveFn(t, type);
+  const i = WAVE_ORDER.indexOf(type);
+  const next = WAVE_ORDER[((i < 0 ? 0 : i) + 1) % WAVE_ORDER.length];
+  const u = morph > 1 ? 1 : morph;
+  const a = waveFn(t, type);
+  return a + (waveFn(t, next) - a) * u;
+}
+function axisMorph(axis) { return axis === 'y' ? (params.morphY || 0) : (params.morphX || 0); }
+
+// Warp — the phase bend from Ableton Wavetable's oscillator. The cycle's own
+// clock is bent by p → p^k, which fixes both ends of the cycle (so the wave stays
+// periodic and continuous however hard it is bent) and redistributes everything
+// between them: +100% crams the whole cycle into its opening, leaving a long flat
+// tail, −100% holds it flat and then fires it off at the very end. On a square it
+// reads as PWM, on a saw as a bent ramp, on a sine as the swept shapes above.
+const WARP_K = 12;
+function warpPhase(ph, w) {
+  if (!(Math.abs(w) > 0.001)) return ph;
+  const cyc = Math.floor(ph / TWO_PI);
+  const p = ph / TWO_PI - cyc;                 // position within this cycle, 0..1
+  return (cyc + Math.pow(p, Math.pow(WARP_K, -w))) * TWO_PI;
+}
+
 // Wavefold: reflect signal at ±1 with triangle-wave mapping
 function foldValue(x) {
   x = x % 4;
@@ -2238,8 +2388,9 @@ function foldValue(x) {
 const TWO_PI = Math.PI * 2;
 
 // Full modulation chain:
-//   decimate → FM (phase) → cross FM → Sync → base wave (+feedback) → waveshape →
-//   fold (+bias) → AM → ring mod → bitcrush → noise
+//   decimate → FM (phase) → cross FM → Sync → warp (phase bend) →
+//   base wave (morph + feedback) → waveshape → fold (+bias) → AM → ring mod →
+//   bitcrush → noise
 // `axis` ('x' | 'y') lets per-axis effects (sync "X only") know which side they're on.
 // Axis targeting for FM / AM: 0 = both axes, 1 = X only, 2 = Y only. Lets one
 // modulator smear a single axis, which breaks the figure's symmetry instead of
@@ -2275,7 +2426,8 @@ function processWave(carrierArg, freqT, type, axis) {
   const rOther = axis === 'x' ? (params.fy / params.fx) : (params.fx / params.fy);
   if (params.crossFm > 0.0001) {
     const otherType = axis === 'x' ? waveTypeY : waveTypeX;
-    ph += (params.crossFm / Math.max(0.25, rOther)) * waveFn(rOther * freqT + modPhase, otherType);
+    const otherMorph = axis === 'x' ? (params.morphY || 0) : (params.morphX || 0);
+    ph += (params.crossFm / Math.max(0.25, rOther)) * morphWaveFn(rOther * freqT + modPhase, otherType, otherMorph);
   }
   // Sync: hard (phase reset) or soft (triangle reflect) at the synced ratio.
   // Optionally affects the X axis only.
@@ -2290,17 +2442,22 @@ function processWave(carrierArg, freqT, type, axis) {
     }
     ph = phf * TWO_PI;
   }
-  // Base wave — with optional phase feedback (the output nudges its own phase,
-  // classic FM-operator feedback growl). Two refinement passes approximate the
-  // recursion statelessly, so every sampling context computes the same value.
-  let s = waveFn(ph, type);
+  // Warp — bend the cycle's own clock before the shape is read from it.
+  if (params.warp) ph = warpPhase(ph, params.warp);
+  // Base wave — morphed towards the next shape in the cycle, with optional phase
+  // feedback (the output nudges its own phase, classic FM-operator feedback
+  // growl). Two refinement passes approximate the recursion statelessly, so every
+  // sampling context computes the same value.
+  const mrp = axisMorph(axis);
+  let s = morphWaveFn(ph, type, mrp);
   if (params.fbAmt > 0.001) {
     const fb = params.fbAmt * 2.5;
-    s = waveFn(ph + fb * s, type);
-    s = waveFn(ph + fb * s, type);
+    s = morphWaveFn(ph + fb * s, type, mrp);
+    s = morphWaveFn(ph + fb * s, type, mrp);
   }
-  // Waveshaping (tanh saturation), normalised
-  if (params.shapeAmt > 0.001) { const k = 1 + params.shapeAmt * 6; s = Math.tanh(s * k) / Math.tanh(k); }
+  // Waveshaping (tanh saturation), normalised. k rises from 0, where the transfer
+  // curve IS the identity, so leaving zero is a fade-in rather than a step.
+  if (params.shapeAmt > 0.0002) { const k = params.shapeAmt * 7; s = Math.tanh(s * k) / Math.tanh(k); }
   // Fold — the bias offsets the input into the folder, breaking its symmetry
   if (params.foldDrive > 1.001 || Math.abs(params.foldBias) > 0.001) s = foldValue(s * params.foldDrive + params.foldBias);
   // AM (normalized)
@@ -2309,7 +2466,8 @@ function processWave(carrierArg, freqT, type, axis) {
   // this is a pure X×Y product (petal / star symmetries).
   if (params.ringAmt > 0.001) {
     const otherType = axis === 'x' ? waveTypeY : waveTypeX;
-    s = s * ((1 - params.ringAmt) + params.ringAmt * waveFn(rOther * freqT + modPhase, otherType));
+    const otherMorph = axis === 'x' ? (params.morphY || 0) : (params.morphX || 0);
+    s = s * ((1 - params.ringAmt) + params.ringAmt * morphWaveFn(rOther * freqT + modPhase, otherType, otherMorph));
   }
   // Bitcrush: quantise the amplitude to 2^(bits−1) levels per polarity.
   if (params.crushBits < 15.5) {
@@ -2333,6 +2491,7 @@ function modComplexity() {
     + params.crossFm * 0.8
     + params.ringAmt * 1.0
     + params.fbAmt * 1.5
+    + Math.abs(params.warp || 0) * 2.5
     + params.crushRate * 0.5;
 }
 
@@ -2372,13 +2531,13 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
   // In lift mode δ never reaches the sampler — it is applied downstream as a
   // rotation — so the sample set is phase-independent and the key drops it. That
   // also means the N copies of a KEEP trail sample ONCE between them, not N times.
-  const memoPhase = lift ? -1 : phase;
+  const memoPhase = (lift ? -1 : phase) + 1000 * (params.phaseY || 0);
   if (_figMemoPhase !== memoPhase || _figMemoRes !== resolution || _figMemoLift !== lift) {
     _figMemoPhase = memoPhase; _figMemoRes = resolution; _figMemoLift = lift;
     for (let i = 0; i <= resolution; i++) {
       const t = (i / resolution) * span;
       sxArr[i] = processWave(fx * t + (lift ? 0 : phase * Math.PI), fx * t, waveTypeX, 'x');
-      syArr[i] = processWave(fy * t, fy * t, waveTypeY, 'y');
+      syArr[i] = processWave(fy * t + params.phaseY * Math.PI, fy * t, waveTypeY, 'y');
     }
     // The depth coordinate: the SAME wave a quarter period ahead. For a sine that
     // is a cosine, so (x, z) rides a circle of radius ax and yawing the curve by
@@ -2412,7 +2571,6 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
 
   // ── Visual transforms: shared depth / rotation-axis / shear pipeline + mirrors ─
   beginFigureXform(phase, false, rx / ry);
-  const zRatio = params.fz || 0;
   const mirrors = figureMirrors();
 
   // Transformed point i under mirror signs mx/my. zFlip renders the far face for
@@ -2425,8 +2583,7 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
     const idx = k ? (i + k) % resolution : i;
     const xs = sxArr[idx];
     const ys = syArr[i];
-    figureXform(visualSwap ? ys : xs, visualSwap ? xs : ys,
-                lift ? szArr[idx] : figureZ(zRatio * (i / resolution) * span), zFlip);
+    figureXform(visualSwap ? ys : xs, visualSwap ? xs : ys, lift ? szArr[idx] : 0, zFlip);
     _P.x = cx + rx * _Q.x * mx;
     _P.y = cy + ry * _Q.y * my;
   };
@@ -2638,7 +2795,7 @@ function applyDotDash(c, dl, lineWidth) {
 // So for triangle/saw/square, and under heavy FM/fold/sync, the lift is a close
 // relative of the flat figure rather than a theorem about it: still a coherent
 // solid that spins, no longer an identity. Sine gives you the identity.
-function liftActive() { return Math.round(params.depthSrc ?? 2) === 1; }
+function liftActive() { return Math.round(params.depthSrc ?? 0) === 1; }
 
 // ── Shared figure transform (main view AND construction view) ─────────────────
 // depth (lift quadrature or z oscillator) → yaw about the chosen axis (Z in-plane
@@ -2657,7 +2814,6 @@ function beginFigureXform(phase, flat, zk) {   // hoist per-frame constants out 
   _xf.zAmt = params.az || 0;
   _xf.lift = liftActive();
   _xf.flat = !!flat;
-  _xf.z = _xf.zAmt > 0.001 && (params.fz || 0) > 0.01;
   // Lift mode adds δ·180° to the yaw. Rotate/spin stay live on top of it as a
   // manual orbit offset, so dragging the view and animating the phase compose
   // instead of fighting over the same angle.
@@ -2681,8 +2837,8 @@ function beginFigureXform(phase, flat, zk) {   // hoist per-frame constants out 
   // figure shears the moment ax ≠ ay. (The pre-existing rotAxis = X path has always
   // skipped this; correcting it there would change how saved presets look.)
   _xf.zk = zk || 1;
-  // Perspective strength: the z oscillator's depth, or an implied depth when
-  // rotating about Y/X so the rotation reads as 3D. The lift takes NEITHER — it
+  // Perspective strength: an implied depth when rotating about Y/X, so the
+  // rotation reads as 3D. The lift takes neither — it
   // defaults to orthographic, because an orthographic projection is precisely
   // what makes the picture the figure. `az` then dials perspective in by hand,
   // and it costs you the identity knowingly rather than behind your back.
@@ -2694,9 +2850,6 @@ function beginFigureXform(phase, flat, zk) {   // hoist per-frame constants out 
 // The lift has genuine depth even with the perspective off, so the back face and
 // the depth cueing still apply — K alone would call an orthographic view flat.
 function figureHasDepth() { return _xf.K > 0.001 || _xf.lift; }
-// The z oscillator's contribution at phase zArg (fz·t). Lift mode ignores it: its
-// depth is a real sampled coordinate, not a third free-running oscillator.
-function figureZ(zArg) { return _xf.z ? Math.sin(zArg) : 0; }
 // px,py = raw sample amplitudes; z = this point's depth amplitude (the caller owns
 // where it came from); zFlip mirrors the depth to render the figure's far
 // ("back") face. Writes the view-space depth to _Q.z so the stroke can be shaded.
@@ -2726,7 +2879,7 @@ function figureXform(px, py, z, zFlip) {
 // range is already clearly visible (0.5 → alpha 0.125, long trails).
 function trailAlpha() {
   const t = params.trailAmt || 0;
-  return t < 0.01 ? 1 : Math.max(0.01, Math.pow(1 - t, 3));
+  return Math.max(0.01, Math.pow(1 - t, 3));   // exactly 1 (= no trail) at t = 0
 }
 
 // ── Trails ───────────────────────────────────────────────────────────────────
@@ -3029,13 +3182,13 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
   // phase they were built at, reset once per frame by render(), so drawing the
   // view in two passes costs one build rather than two — while a ghost at a
   // different phase still gets its own.
-  const m4MemoPhase = m4Lift ? -1 : phase;   // lift mode: δ is a yaw, not a sample offset
+  const m4MemoPhase = (m4Lift ? -1 : phase) + 1000 * (params.phaseY || 0);   // lift mode: δ is a yaw, not a sample offset
   if (_m4MemoPhase !== m4MemoPhase || _m4MemoRes !== res || _m4MemoLift !== m4Lift) {
     _m4MemoPhase = m4MemoPhase; _m4MemoRes = res; _m4MemoLift = m4Lift;
     for (let i = 0; i <= res; i++) {
       const τ = (i / res) * T;
       ampXArr[i] = processWave(fx * τ + (m4Lift ? 0 : phase * Math.PI), fx * τ, waveTypeX, 'x');
-      ampYArr[i] = processWave(fy * τ, fy * τ, waveTypeY, 'y');
+      ampYArr[i] = processWave(fy * τ + params.phaseY * Math.PI, fy * τ, waveTypeY, 'y');
     }
     if (m4Lift) {
       for (let i = 0; i <= res; i++) {
@@ -3095,7 +3248,6 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
   // mirrors / fill / unison ghosts), matching the main view. The strips stay
   // raw waveforms; the figure box shows the transformed result.
   beginFigureXform(phase, false, rx / ry);
-  const fzr = params.fz || 0;
   const m4Mirrors = figureMirrors();
   // Trace one full figure path under mirror signs mx/my. τOff shifts the HORIZONTAL
   // axis only (the unison ghost): sliding both axes together would retrace the same
@@ -3105,7 +3257,7 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
     for (let i = 0; i <= res; i++) {
       const τ = (i / res) * T;
       let τh = τ + τOff; if (τh >= T) τh -= T;
-      figureXform(hAt(τh), vAt(τ), m4Lift ? zAt(zTime(τh, τ)) : figureZ(fzr * τ), zFlip);
+      figureXform(hAt(τh), vAt(τ), m4Lift ? zAt(zTime(τh, τ)) : 0, zFlip);
       const xp = cx + rx * _Q.x * mx, yp = cy + ry * _Q.y * my;
       i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
     }
@@ -3147,7 +3299,7 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
   // ── Current positions (figure point runs through the same transform)
   const xAmpNow = hAt(t);
   const yAmpNow = vAt(t);
-  figureXform(xAmpNow, yAmpNow, m4Lift ? zAt(t) : figureZ(fzr * t), false);
+  figureXform(xAmpNow, yAmpNow, m4Lift ? zAt(t) : 0, false);
   const figPx = cx + rx * _Q.x;
   const figPy = cy + ry * _Q.y;
   hPt(t, xAmpNow); const xDotX = _S.x, xDotY = _S.y;   // dot on the top strip
@@ -3172,7 +3324,7 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
       ctx.beginPath();
       for (let i = 0; i <= trailRes; i++) {
         const τ = (i / trailRes) * t;
-        figureXform(hAt(τ), vAt(τ), m4Lift ? zAt(τ) : figureZ(fzr * τ), false);
+        figureXform(hAt(τ), vAt(τ), m4Lift ? zAt(τ) : 0, false);
         const xp = cx + rx * _Q.x * mx, yp = cy + ry * _Q.y * my;
         i === 0 ? ctx.moveTo(xp, yp) : ctx.lineTo(xp, yp);
       }
@@ -3216,7 +3368,7 @@ function woBuild() {
   for (let i = 0; i <= WO_N; i++) {
     const τ = (i / WO_N) * T;
     _woBufX[i] = processWave(fx * τ + params.phase * Math.PI, fx * τ, waveTypeX, 'x');
-    _woBufY[i] = processWave(fy * τ, fy * τ, waveTypeY, 'y');
+    _woBufY[i] = processWave(fy * τ + params.phaseY * Math.PI, fy * τ, waveTypeY, 'y');
   }
   if (filterIsOn()) {
     const g = gcd(fx, fy), HC = filterHarmonics();
@@ -3368,7 +3520,7 @@ function render(now) {
 
   if (constructionView && animating) animPhase = (animPhase + 0.004 * animSpeed) % 2;
   const drawPhase = constructionView ? (animating ? animPhase : params.phase) : phase;
-  const zoom = Math.max(0.6, recZoom);
+  const zoom = Math.max(ZOOM_MIN, recZoom);
   _m4MemoPhase = NaN; _figMemoPhase = NaN;    // the sample memos are per-frame
 
   paintBackdrop();
@@ -3459,7 +3611,7 @@ document.getElementById('anim-speed').addEventListener('input', e => {
   document.getElementById('speed-val').textContent = animSpeed.toFixed(1) + '×';
 });
 
-const WAVES = ['sine', 'triangle', 'sawtooth', 'square'];
+const WAVES = WAVE_ORDER;
 
 // Set a base waveform for an axis and reflect it in the toggle buttons + audio.
 function setBaseWave(axis, type) {
@@ -3468,6 +3620,7 @@ function setBaseWave(axis, type) {
   document.querySelectorAll(`.wave-btn[data-axis="${axis}"]`).forEach(b => {
     b.classList.toggle('active', b.dataset.bwave === type);
   });
+  updateMorphLabels();   // Morph names the shape it is heading towards
   drawWavePreview();
   syncAudioParams();
   schedulePeriodicWaveUpdate();
@@ -3532,7 +3685,7 @@ document.getElementById('btn-export').addEventListener('click', () => {
   for (let i = 0; i <= steps; i++) {
     const t = (i / steps) * T;
     const sx = processWave(fx * t + phase * Math.PI, fx * t, waveTypeX, 'x');
-    const sy = processWave(fy * t, fy * t, waveTypeY, 'y');
+    const sy = processWave(fy * t + params.phaseY * Math.PI, fy * t, waveTypeY, 'y');
     const x = cx + rx * (visualSwap ? sy : sx);
     const y = cy + ry * (visualSwap ? sx : sy);
     points.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(3)},${y.toFixed(3)}`);
@@ -3842,6 +3995,9 @@ function recomputeNoteRatio() {
 const VEL_RANGES = {
   fmAmount:  [0, 8],
   fmRatio:   [0.5, 8],
+  warp:      [-1, 1],
+  morphX:    [0, 1],
+  morphY:    [0, 1],
   shapeAmt:  [0, 1],
   syncAmt:   [0.1, 2],
   foldDrive: [1, 8],
@@ -3861,13 +4017,13 @@ const VEL_RANGES = {
   ax:        [0.1, 1],
   ay:        [0.1, 1],
   phase:     [0, 2],
+  phaseY:    [0, 2],
   lineWidth: [0.5, 8],
   dotsLine:  [0, 1],
   rotateAngle: [0, 360],
   tiltAngle: [-89, 89],
   shearAmt:  [-1, 1],
   trailAmt:  [0, 0.97],
-  fz:        [0, 8],
   az:        [0, 1],
   traceSpeed:    [0, 5],
   untracedAlpha: [0, 1],
@@ -3902,9 +4058,12 @@ const PARAM_UI = {
   tiltAngle: { slider: 'tilt-angle', disp: 'tilt-angle-val', fmt: v => Math.round(v) + '°' },
   traceSpeed:    { slider: 'trace-speed',    disp: 'trace-speed-val',    fmt: v => v.toFixed(1) + '×' },
   untracedAlpha: { slider: 'untraced-alpha', disp: 'untraced-alpha-val', fmt: v => Math.round(v*100) + '%' },
+  warp:      { slider: 'warp',       disp: 'warp-val',       fmt: v => fmtWarp(v) },
+  morphX:    { slider: 'morph-x',    disp: 'morph-x-val',    fmt: v => fmtMorph(v, 'x') },
+  morphY:    { slider: 'morph-y',    disp: 'morph-y-val',    fmt: v => fmtMorph(v, 'y') },
   shapeAmt:  { slider: 'shape-amt',  disp: 'shape-amt-val',  fmt: v => v.toFixed(2) },
   syncAmt:   { slider: 'sync-amt',   disp: 'sync-amt-val',   fmt: v => v.toFixed(2) },
-  foldDrive: { slider: 'fold-drive', disp: 'fold-drive-val', fmt: v => v.toFixed(1) },
+  foldDrive: { slider: 'fold-drive', disp: 'fold-drive-val', fmt: v => fmtFold(v) },
   amAmt:     { slider: 'am-amt',     disp: 'am-amt-val',     fmt: v => v.toFixed(2) },
   noiseAmt:  { slider: 'noise-amt',  disp: 'noise-amt-val',  fmt: v => v.toFixed(3) },
   crossFm:   { slider: 'cross-fm',   disp: 'cross-fm-val',   fmt: v => v.toFixed(2) },
@@ -3918,11 +4077,11 @@ const PARAM_UI = {
   rotateAngle: { slider: 'rotate-angle', disp: 'rotate-angle-val', fmt: v => Math.round(v) + '°' },
   shearAmt:  { slider: 'shear-amt',  disp: 'shear-amt-val',  fmt: v => v.toFixed(2) },
   trailAmt:  { slider: 'trail-amt',  disp: 'trail-amt-val',  fmt: v => (v < 0.01 ? 'off' : Math.round(v*100) + '%') },
-  fz:        { slider: 'fz',         disp: 'fz-val',         fmt: v => (v < 0.01 ? 'off' : (Number.isInteger(v) ? v : v.toFixed(1))) },
   az:        { slider: 'az',         disp: 'az-val',         fmt: v => Math.round(v*100) + '%' },
   ax:        { slider: 'ax',         disp: 'ax-val',         fmt: v => v.toFixed(2) },
   ay:        { slider: 'ay',         disp: 'ay-val',         fmt: v => v.toFixed(2) },
   phase:     { slider: 'phase',      disp: 'phase-val',      fmt: v => v.toFixed(2) + 'π' },
+  phaseY:    { slider: 'phase-y',    disp: 'phase-y-val',    fmt: v => v.toFixed(2) + 'π' },
   lineWidth: { slider: 'line-width', disp: 'line-width-val', fmt: v => v.toFixed(1) },
 };
 
@@ -3978,7 +4137,7 @@ function lfoSet(key, v) {
 let LFO_TARGET_OPTIONS = [];   // filled by completeVelRanges(), below MAP_TARGETS
 // Keys whose modulation requires rebuilding the periodic wavetable (noise and the
 // unison pair are live audio nodes tracked in pwTick, so they're excluded here).
-const LFO_SYNTH_KEYS = ['fmAmount','fmRatio','crossFm','ringAmt','fbAmt','shapeAmt','syncAmt','foldDrive','foldBias','crushBits','crushRate','amAmt','amRatio','filterCutoff','filterQ','waveX','waveY','noiseAmt'];
+const LFO_SYNTH_KEYS = ['fmAmount','fmRatio','crossFm','ringAmt','fbAmt','shapeAmt','syncAmt','foldDrive','foldBias','crushBits','crushRate','amAmt','amRatio','filterCutoff','filterQ','waveX','waveY','noiseAmt','warp','morphX','morphY'];
 
 function lfoWaveFn(phase, type) {
   // phase in [0,1]
@@ -4664,13 +4823,11 @@ document.getElementById('dots-line').addEventListener('input', e => {
 // ── Visual transform sliders (figure-only — no wavetable rebuild needed) ──────
 const fmtDeg   = v => Math.round(v) + '°';
 const fmtTrail = v => v < 0.01 ? 'off' : Math.round(v * 100) + '%';
-const fmtZ     = v => v < 0.01 ? 'off' : (Number.isInteger(v) ? v : v.toFixed(1));
 const fmtPct   = v => Math.round(v * 100) + '%';
 const VISUAL_SLIDERS = [
   ['rotate-angle', 'rotateAngle', fmtDeg],
   ['shear-amt',    'shearAmt',    v => v.toFixed(2)],
   ['trail-amt',    'trailAmt',    fmtTrail],
-  ['fz',           'fz',          fmtZ],
   ['az',           'az',          v => Math.round(v * 100) + '%'],
   ['tilt-angle',   'tiltAngle',   fmtDeg],
 ];
@@ -4734,12 +4891,14 @@ document.querySelectorAll('.wave-btn[data-rotaxis]').forEach(btn => {
 
 document.getElementById('rotate-spin').addEventListener('change', e => { rotSpin = e.target.checked; });
 
-// Depth source: flat / phase lift / z oscillator. The lift makes δ a rotation
-// angle rather than a waveform offset, so the panel relabels itself around it —
-// `az` stops being a depth amount and becomes the perspective control, δ stops
-// being a position and becomes an angle, and the Z ratio has nothing to drive.
+// Depth source: flat / phase lift. The lift makes δ a rotation angle rather than
+// a waveform offset, so the panel relabels itself around it — `az` stops being a
+// depth amount and becomes the perspective control, and δ stops being a position
+// and becomes an angle.
 function setDepthSrc(n) {
-  n = Math.max(0, Math.min(2, Math.round(n)));
+  n = Math.round(n);
+  if (n === 2) n = 0;                       // patches saved with the old Z OSC
+  n = Math.max(0, Math.min(1, n));
   const changed = params.depthSrc !== n;
   params.depthSrc = n;
   document.querySelectorAll('.wave-btn[data-depthsrc]').forEach(b => {
@@ -4748,9 +4907,6 @@ function setDepthSrc(n) {
     b.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
   const lift = n === 1;
-  const dim = (id, off) => { const e = document.getElementById(id); if (e) e.style.opacity = off ? 0.4 : 1; };
-  dim('fz-row', n !== 2);
-  const fzEl = document.getElementById('fz'); if (fzEl) fzEl.disabled = (n !== 2);
   ['depth-shade', 'show-shadow'].forEach(id => {
     const cb = document.getElementById(id);
     if (!cb) return;
@@ -4853,6 +5009,11 @@ bindRatioSlider('fm-ratio', 'fm-ratio-val', 'fmRatio');
 bindRatioSlider('am-ratio', 'am-ratio-val', 'amRatio');
 
 const fmtBits     = v => v >= 15.5 ? 'off' : v.toFixed(1) + ' bit';
+// Warp and Fold are shown the way Wavetable shows them: a signed percentage and
+// a 0–100% drive. `foldDrive` keeps its 1..8 gain internally so patches saved
+// before the relabel still mean what they meant.
+const fmtWarp     = v => (v * 100).toFixed(1) + ' %';
+const fmtFold     = v => Math.round((v - 1) / 7 * 100) + ' %';
 const fmtDecimate = v => v < 0.005 ? 'off' : Math.round(v * 100) + '%';
 const SYNTH_SLIDERS = [
   ['fm-amount',   'fmAmount',  v => v.toFixed(1)],
@@ -4861,7 +5022,8 @@ const SYNTH_SLIDERS = [
   ['fb-amt',      'fbAmt',     v => v.toFixed(2)],
   ['shape-amt',   'shapeAmt',  v => v.toFixed(2)],
   ['sync-amt',    'syncAmt',   v => v.toFixed(2)],
-  ['fold-drive',  'foldDrive', v => v.toFixed(1)],
+  ['warp',        'warp',      fmtWarp],
+  ['fold-drive',  'foldDrive', fmtFold],
   ['fold-bias',   'foldBias',  v => v.toFixed(2)],
   ['crush-bits',  'crushBits', fmtBits],
   ['crush-rate',  'crushRate', fmtDecimate],
@@ -4878,6 +5040,41 @@ SYNTH_SLIDERS.forEach(([id, key, fmt]) => {
 });
 
 
+
+// ── Waveform morph (per axis) ────────────────────────────────────────────────
+// The read-out names the shape being morphed INTO, which is the only thing the
+// number on its own doesn't tell you.
+function morphTargetLabel(type) {
+  const i = WAVE_ORDER.indexOf(type);
+  return WAVE_LABELS[WAVE_ORDER[((i < 0 ? 0 : i) + 1) % WAVE_ORDER.length]];
+}
+function fmtMorph(v, axis) {
+  if (!(v > 0.005)) return 'off';
+  return Math.round(v * 100) + '% → ' + morphTargetLabel(axis === 'y' ? waveTypeY : waveTypeX);
+}
+function updateMorphLabels() {
+  const x = document.getElementById('morph-x-val');
+  if (x) x.textContent = fmtMorph(params.morphX || 0, 'x');
+  const y = document.getElementById('morph-y-val');
+  if (y) y.textContent = fmtMorph(params.morphY || 0, 'y');
+}
+[['morph-x', 'morphX', 'x'], ['morph-y', 'morphY', 'y']].forEach(([id, key, axis]) => {
+  document.getElementById(id).addEventListener('input', e => {
+    params[key] = parseFloat(e.target.value);
+    updateMorphLabels();
+    drawWavePreview();
+    schedulePeriodicWaveUpdate();
+  });
+});
+
+// ── The Y carrier's own phase offset ────────────────────────────────────────
+// δ moves X only. δʏ is the same offset on Y and is deliberately NOT animated:
+// it picks the figure, δ turns it.
+document.getElementById('phase-y').addEventListener('input', e => {
+  params.phaseY = parseFloat(e.target.value);
+  document.getElementById('phase-y-val').textContent = params.phaseY.toFixed(2) + 'π';
+  drawWavePreview();
+});
 
 // ── Sync mode checkboxes (hard/soft + single axis) ───────────────────────────
 document.getElementById('sync-hard').addEventListener('change', e => {
@@ -5336,9 +5533,12 @@ const MAP_TARGETS = {
   ay:        { label:'Y Amplitude',   min:0.1,  max:1,              apply:v => { params.ay = v; const e=document.getElementById('ay'); if(e)e.value=v; const d=document.getElementById('ay-val'); if(d)d.textContent=v.toFixed(2); } },
   fmAmount:  { label:'FM Amount',     min:0,    max:8,              apply:_synthApply('fmAmount','fm-amount','fm-amount-val',x=>x.toFixed(1)) },
   fmRatio:   { label:'FM Ratio',      min:0.5,  max:8,              apply:v => setRatioParam('fmRatio','fm-ratio','fm-ratio-val',v) },
+  warp:      { label:'Warp',          min:-1,   max:1,              apply:_synthApply('warp','warp','warp-val',fmtWarp) },
+  morphX:    { label:'X Wave Morph',  min:0,    max:1,              apply:v => { params.morphX = v; const e=document.getElementById('morph-x'); if(e)e.value=v; updateMorphLabels(); drawWavePreview(); schedulePeriodicWaveUpdate(); } },
+  morphY:    { label:'Y Wave Morph',  min:0,    max:1,              apply:v => { params.morphY = v; const e=document.getElementById('morph-y'); if(e)e.value=v; updateMorphLabels(); drawWavePreview(); schedulePeriodicWaveUpdate(); } },
   shapeAmt:  { label:'Waveshape',     min:0,    max:1,              apply:_synthApply('shapeAmt','shape-amt','shape-amt-val',x=>x.toFixed(2)) },
   syncAmt:   { label:'Sync Ratio',    min:0.1,  max:2,   step:0.05, apply:_synthApply('syncAmt','sync-amt','sync-amt-val',x=>x.toFixed(2)) },
-  foldDrive: { label:'Drive (fold)',  min:1,    max:8,              apply:_synthApply('foldDrive','fold-drive','fold-drive-val',x=>x.toFixed(1)) },
+  foldDrive: { label:'Fold',          min:1,    max:8,              apply:_synthApply('foldDrive','fold-drive','fold-drive-val',fmtFold) },
   amAmt:     { label:'AM Depth',      min:0,    max:1,              apply:_synthApply('amAmt','am-amt','am-amt-val',x=>x.toFixed(2)) },
   amRatio:   { label:'AM Ratio',      min:0.5,  max:8,              apply:v => setRatioParam('amRatio','am-ratio','am-ratio-val',v) },
   noiseAmt:  { label:'Noise (wave)',  min:0,    max:0.1,            apply:_synthApply('noiseAmt','noise-amt','noise-amt-val',x=>x.toFixed(3)) },
@@ -5362,12 +5562,11 @@ const MAP_TARGETS = {
   trailMode:{ label:'Trail Mode',     min:0,    max:1,   step:1,    apply:v => setTrailMode(v) },
   trailCount:{ label:'Trail Count',   min:0,    max:16,  step:1,    apply:v => setSliderParam('trailCount','trail-count','trail-count-val',x=>String(Math.round(x)),v) },
   trailSpacing:{ label:'Trail Spacing', min:0.005, max:0.5,        apply:v => setSliderParam('trailSpacing','trail-spacing','trail-spacing-val',x=>x.toFixed(3)+'π',v) },
-  depthSrc:  { label:'Depth Source',   min:0,    max:2,   step:1,    apply:v => setDepthSrc(v) },
+  depthSrc:  { label:'Depth Source',   min:0,    max:1,   step:1,    apply:v => setDepthSrc(v) },
   tiltAngle: { label:'Orbit Tilt',     min:-89,  max:89,             apply:v => setSliderParam('tiltAngle','tilt-angle','tilt-angle-val',x=>Math.round(x)+'°',v) },
   depthShade:{ label:'Depth Shading', toggle:true, apply:b => { params.depthShade = b ? 1 : 0; const cb=document.getElementById('depth-shade'); if (cb) cb.checked = b; } },
   showShadow:{ label:'Flat Shadow',   toggle:true, apply:b => { params.showShadow = b ? 1 : 0; const cb=document.getElementById('show-shadow'); if (cb) cb.checked = b; } },
-  fz:        { label:'Z Ratio',       min:0,    max:8,   step:0.5,  apply:v => setSliderParam('fz','fz','fz-val',x=>(x<0.01?'off':(Number.isInteger(x)?x:x.toFixed(1))),v) },
-  az:        { label:'Z Depth',       min:0,    max:1,              apply:v => setSliderParam('az','az','az-val',x=>Math.round(x*100)+'%',v) },
+  az:        { label:'Depth',         min:0,    max:1,              apply:v => setSliderParam('az','az','az-val',x=>Math.round(x*100)+'%',v) },
   waveX:     { label:'X Wave Cycle',  min:0,    max:3,   step:1,    apply:v => setBaseWave('x', WAVES[Math.max(0,Math.min(3,Math.round(v)))]) },
   waveY:     { label:'Y Wave Cycle',  min:0,    max:3,   step:1,    apply:v => setBaseWave('y', WAVES[Math.max(0,Math.min(3,Math.round(v)))]) },
   lfo0Rate:  { label:'LFO 1 Rate',    min:0.01, max:6,              apply:v => { lfos[0].freq = v; const e=document.getElementById('lfo0-freq'); if(e)e.value=v; const d=document.getElementById('lfo0-freq-val'); if(d)d.textContent=v.toFixed(2)+' Hz'; } },
@@ -5379,6 +5578,7 @@ const MAP_TARGETS = {
   light:     { label:'Colour Light',  min:0,    max:100,            apply:v => { strokeHSL.l = v; applyStrokeHSL(); } },
   lineWidth: { label:'Line Width',    min:0.5,  max:8,              apply:v => { params.lineWidth = v; document.getElementById('line-width').value=v; document.getElementById('line-width-val').textContent=v.toFixed(1); } },
   phase:     { label:'Phase δ',       min:0,    max:2,              apply:v => { params.phase = v; animPhase = v; document.getElementById('phase').value=v; document.getElementById('phase-val').textContent=v.toFixed(2)+'π'; updateStatus(); } },
+  phaseY:    { label:'Y Phase δʏ',    min:0,    max:2,              apply:v => { params.phaseY = v; const e=document.getElementById('phase-y'); if(e)e.value=v; const d=document.getElementById('phase-y-val'); if(d)d.textContent=v.toFixed(2)+'π'; } },
   animSpeed: { label:'Anim Speed',    min:0.1,  max:5,              apply:v => { animSpeed = v; document.getElementById('anim-speed').value=v; document.getElementById('speed-val').textContent=v.toFixed(1)+'×'; } },
   volume:    { label:'Volume',        min:0,    max:1,              apply:v => { document.getElementById('audio-vol').value=v; document.getElementById('vol-val').textContent=Math.round(v*100)+'%'; if (masterGain) masterGain.gain.setTargetAtTime(v, audioCtx.currentTime, 0.02); } },
   filterCutoff:{ label:'Filter Cutoff', min:0, max:1,              apply:v => { params.filterCutoff=v; const e=document.getElementById('filter-freq'); if(e)e.value=v; const d=document.getElementById('filter-freq-val'); if(d)d.textContent=fmtCutoff(v); drawWavePreview(); schedulePeriodicWaveUpdate(); } },
@@ -5395,13 +5595,13 @@ completeVelRanges();
 
 // Starting values per mappable target — used to restore params when MIDI disconnects.
 const MAP_DEFAULTS = {
-  fx:3, fy:2, ax:1, ay:1, fmAmount:0, fmRatio:2, shapeAmt:0,
+  fx:3, fy:2, ax:1, ay:1, fmAmount:0, fmRatio:2, shapeAmt:0, warp:0, morphX:0, morphY:0,
   syncAmt:1, foldDrive:1, amAmt:0, amRatio:2, noiseAmt:0, waveX:0, waveY:0,
   crossFm:0, ringAmt:0, fbAmt:0, foldBias:0, crushBits:16, crushRate:0,
   unisonDetune:0, unisonMix:0,
-  rotateAngle:0, rotAxis:0, rotSpin:0, fillSurface:0, shearAmt:0, trailAmt:0, trailMode:0, trailCount:4, trailSpacing:0.08, mirrorMode:0, m4Rotate:1, fz:0, az:0,
+  rotateAngle:0, rotAxis:0, rotSpin:0, fillSurface:0, shearAmt:0, trailAmt:0, trailMode:0, trailCount:4, trailSpacing:0.08, mirrorMode:0, m4Rotate:1, az:0,
   lfo0Rate:0.5, lfo0Depth:0.5, lfo1Rate:1.0, lfo1Depth:0.5,
-  hue:79, sat:84, light:66, lineWidth:1.5, phase:0.5, animSpeed:1, volume:0.5,
+  hue:79, sat:84, light:66, lineWidth:1.5, phase:0.5, phaseY:0, animSpeed:1, volume:0.5,
   filterCutoff:1, filterQ:0.7, dotsLine:1,
   preset:0, constructionView:0, animatePhase:1, visualSwap:0,
 };
@@ -5825,7 +6025,10 @@ function applyPeriodicWave() {
     const syncDiffers = syncSingle && Math.abs(params.syncAmt - 1) > 0.001;
     const fmDiffers = (params.fmAxis | 0) !== 0 && params.fmAmount > 0.0001;
     const amDiffers = (params.amAxis | 0) !== 0 && params.amAmt > 0.001;
-    const axisDiffers = syncDiffers || fmDiffers || amDiffers;
+    // A per-axis waveform morph makes the two axes different waves even when both
+    // buttons name the same shape, so the wavetable can no longer be shared.
+    const morphDiffers = Math.abs((params.morphX || 0) - (params.morphY || 0)) > 0.0005;
+    const axisDiffers = syncDiffers || fmDiffers || amDiffers || morphDiffers;
     const pwY = (waveTypeY === waveTypeX && !axisDiffers) ? pwX : buildPeriodicWave(waveTypeY, 'y');
     if (pwY) oscY.setPeriodicWave(pwY);
     if (pwX && oscX2) oscX2.setPeriodicWave(pwX);
@@ -5897,6 +6100,9 @@ function refreshAllControls() {
   setS('fx', params.fx, 'fx-val', v => Number.isInteger(v) ? v : v.toFixed(1));
   setS('fy', params.fy, 'fy-val', v => Number.isInteger(v) ? v : v.toFixed(1));
   setS('phase', params.phase, 'phase-val', v => v.toFixed(2) + 'π');
+  setS('phase-y', params.phaseY ?? 0, 'phase-y-val', v => v.toFixed(2) + 'π');
+  setS('morph-x', params.morphX ?? 0);
+  setS('morph-y', params.morphY ?? 0);
   document.getElementById('bg-color').value = params.bgColor;
   applyPageBg();
   setS('line-width', params.lineWidth, 'line-width-val', v => v.toFixed(1));
@@ -5906,6 +6112,7 @@ function refreshAllControls() {
   applyAudioChannelMode();
   setBaseWave('x', waveTypeX);
   setBaseWave('y', waveTypeY);
+  updateMorphLabels();
   setModWave('fm', params.fmWave || 'sine');
   setModWave('am', params.amWave || 'sine');
   setModAxis('fm', params.fmAxis ?? 0);
@@ -5929,7 +6136,7 @@ function refreshAllControls() {
   setTrailMode(params.trailMode ?? 0);
   TRAIL_KEEP_SLIDERS.forEach(([id, key, fmt]) => setS(id, params[key] ?? 0, id + '-val', fmt));
   setRotAxis(params.rotAxis ?? 0);
-  setDepthSrc(params.depthSrc ?? 2);
+  setDepthSrc(params.depthSrc ?? 0);
   document.getElementById('depth-shade').checked = !!params.depthShade;
   document.getElementById('show-shadow').checked = !!params.showShadow;
   document.getElementById('rotate-spin').checked = rotSpin;
@@ -6020,7 +6227,17 @@ document.getElementById('sidebar-toggle').addEventListener('click', () => {
 // ─── VIDEO RECORDING (mp4 / webm) ─────────────────────────────────────────────
 let recAspectName = '1:1';
 let recAspect = [1, 1];
+// Zoom on the figure. It frames the recording too, which is where it used to
+// live, but it is a view control and the whole app reads it through this clamp.
+const ZOOM_MIN = 0.1, ZOOM_MAX = 4;
 let recZoom = 1;
+function setZoom(v, fromSlider) {
+  if (!isFinite(v)) return;
+  recZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v));
+  if (!fromSlider) { const e = document.getElementById('rec-zoom'); if (e) e.value = recZoom; }
+  const d = document.getElementById('rec-zoom-val'); if (d) d.textContent = recZoom.toFixed(2) + '×';
+  updateRecOverlay();
+}
 let recShowFrame = false;
 let recording = false;
 let mediaRecorder = null, recChunks = [];
@@ -6049,9 +6266,9 @@ function captureRecFrame(phase) {
     fullCtx.fillRect(0, 0, F, F);
     fullCtx.drawImage(canvas, Math.round(figBox.x * d), Math.round(figBox.y * d), s, s, 0, 0, F, F);
   } else if (constructionView) {
-    drawMode4(fullCtx, F, F, phase, false, Math.max(0.6, recZoom));
+    drawMode4(fullCtx, F, F, phase, false, Math.max(ZOOM_MIN, recZoom));
   } else {
-    drawLissajous(fullCtx, F, F, phase, params.resolution, Math.max(0.6, recZoom));
+    drawLissajous(fullCtx, F, F, phase, params.resolution, Math.max(ZOOM_MIN, recZoom));
   }
   const outW = recCanvas.width, outH = recCanvas.height;
   const a = outW / outH;
@@ -6145,7 +6362,7 @@ function updateRecOverlay() {
   ov.style.top  = ((figBox.y - aRect.top) + (S - h) / 2) + 'px';
   ov.style.width = w + 'px';
   ov.style.height = h + 'px';
-  ov.dataset.label = `${aw}:${ah}  ${Math.max(0.6, recZoom).toFixed(2)}×`;
+  ov.dataset.label = `${aw}:${ah}  ${Math.max(ZOOM_MIN, recZoom).toFixed(2)}×`;
   ov.classList.add('active');
 }
 
@@ -6158,10 +6375,72 @@ document.querySelectorAll('.wave-btn[data-aspect]').forEach(btn => {
     updateRecOverlay();
   });
 });
-document.getElementById('rec-zoom').addEventListener('input', e => {
-  recZoom = parseFloat(e.target.value);
-  document.getElementById('rec-zoom-val').textContent = recZoom.toFixed(2) + '×';
-  updateRecOverlay();
+document.getElementById('rec-zoom').addEventListener('input', e => setZoom(parseFloat(e.target.value), true));
+
+// ── Zoom by gesture ─────────────────────────────────────────────────────────
+// Shift-scroll (and ⌘/Ctrl-scroll, which is what a trackpad pinch reports) over
+// the figure, or a real two-finger pinch on touch. Everything is refused over the
+// chrome, so the sidebar still scrolls and a pinch there is still the browser's.
+function zoomableTarget(t) { return !(t && t.closest && t.closest(ORBIT_CHROME)); }
+window.addEventListener('wheel', e => {
+  if (!(e.shiftKey || e.ctrlKey || e.metaKey)) return;
+  if (!zoomableTarget(e.target)) return;
+  // Shift-scroll is delivered as horizontal movement on most platforms, so take
+  // whichever axis actually moved.
+  const d = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  if (!d) return;
+  // deltaMode 1 = lines, 2 = pages; normalise both to something pixel-ish.
+  const px = d * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+  e.preventDefault();
+  setZoom(recZoom * Math.exp(-px * 0.0022));
+}, { passive: false });
+
+let _pinch = null;
+function pinchDist(t) {
+  const dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY;
+  return Math.hypot(dx, dy);
+}
+window.addEventListener('touchstart', e => {
+  if (e.touches.length !== 2 || !zoomableTarget(e.target)) return;
+  _pinch = { d0: pinchDist(e.touches), z0: recZoom };
+  orbitEnd();   // a second finger ends any orbit drag the first one started
+}, { passive: true });
+window.addEventListener('touchmove', e => {
+  if (!_pinch || e.touches.length !== 2) return;
+  const d = pinchDist(e.touches);
+  if (d < 8 || _pinch.d0 < 8) return;
+  e.preventDefault();
+  setZoom(_pinch.z0 * (d / _pinch.d0));
+}, { passive: false });
+['touchend', 'touchcancel'].forEach(ev =>
+  window.addEventListener(ev, e => { if (e.touches.length < 2) _pinch = null; }, { passive: true }));
+
+// ── Number keys 1–9 fire the first nine preset pads ─────────────────────────
+// Shift-digit stores into one, mirroring shift-click. `code` rather than `key`,
+// so a shifted digit is still recognised as a digit.
+function typingInField(t) {
+  if (!t) return false;
+  if (t.isContentEditable) return true;
+  const tag = t.tagName;
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag === 'INPUT') {
+    const ty = (t.type || 'text').toLowerCase();
+    // A slider or checkbox takes no typed digits, so a number key over one is
+    // still a shortcut; a number or text field is genuinely being typed into.
+    return !['range', 'checkbox', 'radio', 'color', 'button', 'file', 'submit'].includes(ty);
+  }
+  return false;
+}
+window.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+  const m = /^(?:Digit|Numpad)([1-9])$/.exec(e.code || '');
+  if (!m) return;
+  if (typingInField(e.target)) return;
+  const i = parseInt(m[1], 10) - 1;
+  if (e.shiftKey) { storeGridPad(i); }
+  else if (gridPresets[i]) { loadGridPad(i); }
+  else return;                       // an empty pad is not a shortcut, it is a miss
+  e.preventDefault();
 });
 document.getElementById('rec-show-frame').addEventListener('change', e => { recShowFrame = e.target.checked; updateRecOverlay(); });
 document.getElementById('rec-toggle').addEventListener('click', () => { recording ? stopRecording() : startRecording(); });
@@ -6315,7 +6594,6 @@ document.getElementById('evolve-reset').addEventListener('click', evolveReset);
 const GRID_PADS = 64;           // 4 columns × 16 rows
 const GRID_BASE_NOTE = 24;      // C1 (note 24, with C-1 = 0)
 let gridChannel = 8;            // MIDI channel (1–16) the whole grid listens on
-let gridStoreMode = false;      // false = click loads a pad, true = click stores into it
 let gridPresets = new Array(GRID_PADS).fill(null);
 let gridActiveIdx = -1;
 
@@ -6332,8 +6610,15 @@ function buildGrid() {
     pad.className = 'grid-pad';
     pad.dataset.idx = i;
     if (gridPadNoteName(i) === null) pad.classList.add('unaddressable');
-    pad.addEventListener('click', () => { gridStoreMode ? storeGridPad(i) : loadGridPad(i); });
+    // One modeless gesture set, so a pad's behaviour never depends on a mode you
+    // have to remember you left switched on: click loads, shift-click stores,
+    // right-click clears.
+    pad.addEventListener('click', e => { e.shiftKey ? storeGridPad(i) : loadGridPad(i); });
     pad.addEventListener('contextmenu', e => { e.preventDefault(); clearGridPad(i); });
+    // Keyboard equivalent of shift-click, since a pad is a real button.
+    pad.addEventListener('keydown', e => {
+      if (e.shiftKey && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); storeGridPad(i); }
+    });
     grid.appendChild(pad);
   }
   renderGrid();
@@ -6358,13 +6643,15 @@ function renderGridPad(i) {
     } else pad.style.color = '#0c0c0e';
     pad.textContent = nm || (i + 1);
     pad.title = `Pad ${i + 1}${nm ? ' · ' + nm + ' (note ' + (GRID_BASE_NOTE + i) + ')' : ''}`
-              + `${p.params ? ' · ' + p.params.fx + ':' + p.params.fy : ''} — click to load, right-click to clear`;
+              + `${p.params ? ' · ' + p.params.fx + ':' + p.params.fy : ''}`
+              + ` — click to load, shift-click to overwrite, right-click to clear`;
   } else {
     pad.style.background = '';
     pad.style.borderColor = '';
     pad.style.color = '';
     pad.textContent = nm || '·';
-    pad.title = `Pad ${i + 1}${nm ? ' · ' + nm + ' (note ' + (GRID_BASE_NOTE + i) + ')' : ' · not MIDI-addressable'} — empty`;
+    pad.title = `Pad ${i + 1}${nm ? ' · ' + nm + ' (note ' + (GRID_BASE_NOTE + i) + ')' : ' · not MIDI-addressable'}`
+              + ` — empty; shift-click to store the current patch`;
   }
 }
 
@@ -6374,6 +6661,17 @@ function storeGridPad(i) {
   gridPresets[i] = serializePreset();
   gridActiveIdx = i;
   renderGrid();
+  flashGridPad(i);
+}
+// A stored pad flashes once. Without the old STORE mode light there is otherwise
+// nothing to tell an overwrite apart from a load.
+function flashGridPad(i) {
+  const pad = document.querySelector(`.grid-pad[data-idx="${i}"]`);
+  if (!pad) return;
+  pad.classList.remove('stored');
+  void pad.offsetWidth;          // restart the animation on a repeat store
+  pad.classList.add('stored');
+  setTimeout(() => pad.classList.remove('stored'), 420);
 }
 
 // ── Preset morphing ───────────────────────────────────────────────────────────
@@ -6383,12 +6681,40 @@ function storeGridPad(i) {
 // lands — applyPresetData() runs in full at the end so the final state is exact.
 let presetMorphSec = 0;   // 0 = instant
 let _morph = null;
+// What a morph does with the parameters that have no in-between:
+//   'start'  step them the moment the pad is hit, then glide the rest around them
+//   'end'    hold the current ones for the whole glide, step as the morph lands
+//   'ignore' never step them — recall only what can be interpolated
+let morphStepMode = 'end';
+function setMorphStepMode(m) {
+  morphStepMode = (m === 'start' || m === 'ignore') ? m : 'end';
+  document.querySelectorAll('.wave-btn[data-morphstep]').forEach(b => {
+    const on = b.dataset.morphstep === morphStepMode;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
 // Excluded from interpolation: quantised/structural values where the in-between
 // is meaningless (ratios would explode the figure's period mid-glide).
 // 'phase' is excluded entirely (never recalled — see applyPresetData) so the
 // running animation stays continuous across a preset change.
 const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'trailMode', 'trailCount', 'm4Rotate', 'phase',
                                 'depthSrc', 'depthShade', 'showShadow']);
+// The rest of a patch's stepped state lives outside `params` — the waveforms, the
+// filter type, the view toggles. Same treatment, same list.
+const MORPH_DISCRETE_TOP = ['waveTypeX', 'waveTypeY', 'visualSwap', 'audioStereo', 'syncHard',
+                            'syncSingle', 'filterType', 'phaseModulators', 'animating',
+                            'constructionView', 'rotSpin'];
+// A copy of `target` whose stepped fields are taken from `source` instead. Both
+// arguments are serializePreset()-shaped, so this composes a patch out of one
+// patch's continuous half and another's stepped half.
+function mergeDiscrete(target, source) {
+  const out = { ...target, params: { ...(target.params || {}) } };
+  const sp = source.params || {};
+  MORPH_DISCRETE.forEach(k => { if (sp[k] !== undefined) out.params[k] = sp[k]; });
+  MORPH_DISCRETE_TOP.forEach(k => { if (source[k] !== undefined) out[k] = source[k]; });
+  return out;
+}
 function lerpHex(a, b, u) {
   const pa = a.replace('#',''), pb = b.replace('#','');
   const c = i => Math.round(parseInt(pa.slice(i,i+2),16) + (parseInt(pb.slice(i,i+2),16) - parseInt(pa.slice(i,i+2),16)) * u);
@@ -6396,7 +6722,15 @@ function lerpHex(a, b, u) {
 }
 function startPresetMorph(data) {
   if (!data) return;
+  const cur = serializePreset();
+  // IGNORE keeps the stepped parameters you are holding, whether the recall is a
+  // glide or instant — it is a property of the recall, not of the glide.
+  if (morphStepMode === 'ignore') data = mergeDiscrete(data, cur);
   if (presetMorphSec < 0.05) { _morph = null; applyPresetData(data); return; }
+  // AT START: step the structure now, so the glide happens inside the new patch's
+  // ratio/mode rather than landing on it. The continuous half is taken from where
+  // we are, so nothing else moves yet.
+  if (morphStepMode === 'start') applyPresetData(mergeDiscrete(cur, data));
   const to = data.params || {};
   const from = {}, keys = [];
   Object.keys(params).forEach(k => {
@@ -6445,15 +6779,6 @@ function clearGridPad(i) {
   renderGridPad(i);
 }
 
-function setGridStoreMode(on) {
-  gridStoreMode = on;
-  document.getElementById('grid-mode-load').classList.toggle('active', !on);
-  document.getElementById('grid-mode-store').classList.toggle('active', on);
-}
-
-document.getElementById('grid-mode-load').addEventListener('click', () => setGridStoreMode(false));
-document.getElementById('grid-mode-store').addEventListener('click', () => setGridStoreMode(true));
-
 // MIDI channel selector (1–16) for the whole grid.
 (() => {
   const sel = document.getElementById('grid-channel');
@@ -6465,6 +6790,10 @@ document.getElementById('grid-mode-store').addEventListener('click', () => setGr
   sel.addEventListener('change', e => { gridChannel = parseInt(e.target.value) || 8; });
 })();
 
+document.querySelectorAll('.wave-btn[data-morphstep]').forEach(btn => {
+  btn.addEventListener('click', () => setMorphStepMode(btn.dataset.morphstep));
+});
+
 // Morph time slider.
 document.getElementById('grid-morph').addEventListener('input', e => {
   presetMorphSec = parseFloat(e.target.value);
@@ -6472,7 +6801,8 @@ document.getElementById('grid-morph').addEventListener('input', e => {
 });
 
 function exportGrid() {
-  const data = { app: 'lissajous-grid', version: 1, baseNote: GRID_BASE_NOTE, channel: gridChannel, morph: presetMorphSec, presets: gridPresets };
+  const data = { app: 'lissajous-grid', version: 2, baseNote: GRID_BASE_NOTE, channel: gridChannel,
+                 morph: presetMorphSec, morphStep: morphStepMode, presets: gridPresets };
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -6493,6 +6823,7 @@ function importGrid(obj) {
     const el = document.getElementById('grid-morph'); if (el) el.value = presetMorphSec;
     const d = document.getElementById('grid-morph-val'); if (d) d.textContent = presetMorphSec < 0.05 ? 'instant' : presetMorphSec.toFixed(1) + 's';
   }
+  if (typeof obj.morphStep === 'string') setMorphStepMode(obj.morphStep);
   gridActiveIdx = -1;
   renderGrid();
 }
@@ -6519,7 +6850,7 @@ document.getElementById('grid-toggle').addEventListener('click', () => {
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 buildGrid();
-setGridStoreMode(false);
+setMorphStepMode(morphStepMode);
 updateConstructionControls();
 buildPresetGrid();
 highlightActivePreset();
