@@ -980,6 +980,17 @@
   @media (prefers-reduced-motion: reduce) { .grid-pad.stored { animation: none; } }
   .grid-meta-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
   .grid-meta-row .map-add-btn { flex: 1; }
+  /* The preset column is 196px wide: a full-width INFO pill on its own line
+     reads as a control rather than a footnote, and two of them cost the pads
+     two rows. Same button and hit target, tucked to the right. */
+  .preset-sidebar-head .info-btn {
+    display: flex;
+    margin: 2px 0 6px auto;
+    padding: 0 6px;
+    gap: 0;
+    border-color: var(--border);
+  }
+  .preset-sidebar-head .info-btn > span[aria-hidden]:not(.info-mark) { display: none; }
   .grid-hint { font-size: 11px; color: var(--muted); line-height: 1.55; }
   .grid-hint strong { color: var(--accent); }
   .preset-pad-grid {
@@ -988,6 +999,7 @@
     overflow-x: hidden;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: min-content;
     gap: 4px;
     padding: 10px 12px 14px;
     align-content: start;
@@ -1138,15 +1150,18 @@
     .preset-sidebar-head > * { margin-bottom: 0 !important; }
     .preset-sidebar-head .section-label { display: none; }  /* the header button names it */
     .preset-sidebar-head .param-row,
+    .preset-sidebar-head .param-header,
+    .preset-sidebar-head .wave-toggle,
     .preset-sidebar-head .param-row ~ .grid-meta-row { grid-column: 1 / -1; }
-    .grid-hint { display: none; }         /* the pads need the height more */
-    /* Explicit row height: at this column count the pads' aspect-ratio doesn't
-       feed back into auto row sizing, so the rows collapse and the pads overlap. */
+    /* The pads need the height more than the prose does; every switch here
+       carries its explanation in a title attribute as well. */
+    .grid-hint,
+    .preset-sidebar-head .info-text,
+    .preset-sidebar-head .info-btn { display: none; }
     .preset-pad-grid {
       grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
-      grid-auto-rows: 46px;
     }
-    .grid-pad { aspect-ratio: auto; font-size: 10px; }
+    .grid-pad { font-size: 10px; }
   }
 
   @media (max-width: 860px) {
@@ -1411,8 +1426,8 @@
           <button class="wave-btn" data-axis="x" data-bwave="square">SQR</button>
         </div>
         <div class="param-row" style="margin-top:5px">
-          <div class="param-header"><label>Morph</label><span class="val" id="morph-x-val">off</span></div>
-          <input type="range" id="morph-x" min="0" max="1" step="0.01" value="0">
+          <div class="param-header"><label>Morph</label><span class="val" id="morph-x-val">SIN</span></div>
+          <input type="range" id="morph-x" min="0" max="3" step="0.01" value="0">
         </div>
       </div>
       <div class="param-row" style="margin-bottom:6px">
@@ -1424,16 +1439,17 @@
           <button class="wave-btn" data-axis="y" data-bwave="square">SQR</button>
         </div>
         <div class="param-row" style="margin-top:5px">
-          <div class="param-header"><label>Morph</label><span class="val" id="morph-y-val">off</span></div>
-          <input type="range" id="morph-y" min="0" max="1" step="0.01" value="0">
+          <div class="param-header"><label>Morph</label><span class="val" id="morph-y-val">SIN</span></div>
+          <input type="range" id="morph-y" min="0" max="3" step="0.01" value="0">
         </div>
         <div class="info-text" data-info-label="the waveform morph">
-          The four buttons pick an exact shape; <strong>Morph</strong> crossfades
-          that shape into the next one along the cycle
-          (SIN → TRI → SAW → SQR → SIN), so every pair of neighbours is reachable
-          continuously and the whole chain is reachable by choosing a different
-          starting shape. At 0 the wave is exactly the one the button names, so
-          nothing moves until you ask it to.
+          <strong>Morph</strong> is a continuous position along the whole chain —
+          SIN → TRI → SAW → SQR — crossfading between each neighbouring pair as it
+          travels, so the four shapes are the landmarks on one sweep rather than
+          four separate choices. The buttons are shortcuts that jump the slider to
+          an exact shape, and a button lights up whenever the slider is sitting
+          precisely on it, so you can always see whether you are on a named
+          waveform or somewhere between two.
         </div>
       </div>
       <canvas class="wave-preview" id="wave-preview" width="208" height="28"></canvas>
@@ -1624,7 +1640,7 @@
     </div>
 
     <div class="section" id="section-axes">
-      <div class="section-label">Frequency and MIDI</div>
+      <div class="section-label">Frequency &amp; MIDI</div>
       <div class="mod-group">
         <div class="vel-row"><span class="vel-label">X Axis</span></div>
         <div class="param-row">
@@ -2217,8 +2233,8 @@ let params = {
   ay: 1, fy: 2,
   phase: 0.5,
   phaseY: 0,      // static phase offset on the Y carrier, in π (X's δ is `phase`)
-  morphX: 0,      // X base wave morph towards the next waveform in the cycle (0..1)
-  morphY: 0,      // Y base wave morph towards the next waveform in the cycle (0..1)
+  morphX: 0,      // X wave position along SIN→TRI→SAW→SQR (0..3, whole = exact shape)
+  morphY: 0,      // Y wave position along SIN→TRI→SAW→SQR (0..3, whole = exact shape)
   strokeColor: '#c8f060',
   bgColor: '#0c0c0e',
   lineWidth: 1.5,
@@ -2349,18 +2365,38 @@ function waveFn(t, type) {
   }
 }
 
-// Morphed base wave: a straight crossfade from the selected shape to the next
-// one in WAVE_ORDER. At morph 0 this is exactly waveFn, so nothing that predates
-// the control changes.
-function morphWaveFn(t, type, morph) {
-  if (!(morph > 0.0005)) return waveFn(t, type);
-  const i = WAVE_ORDER.indexOf(type);
-  const next = WAVE_ORDER[((i < 0 ? 0 : i) + 1) % WAVE_ORDER.length];
-  const u = morph > 1 ? 1 : morph;
-  const a = waveFn(t, type);
-  return a + (waveFn(t, next) - a) * u;
+// The base wave at an absolute position along WAVE_ORDER: 0 = SIN, 1 = TRI,
+// 2 = SAW, 3 = SQR, with a straight crossfade between each neighbouring pair.
+// A whole number is exactly that shape, so the four buttons are landmarks on one
+// continuous sweep rather than a separate choice from it.
+const MORPH_MAX = WAVE_ORDER.length - 1;   // 3
+function morphWaveFn(t, pos) {
+  const p = pos > 0 ? (pos < MORPH_MAX ? pos : MORPH_MAX) : 0;
+  const i = Math.floor(p);
+  const f = p - i;
+  const a = waveFn(t, WAVE_ORDER[i]);
+  if (f < 0.0005 || i >= MORPH_MAX) return a;
+  return a + (waveFn(t, WAVE_ORDER[i + 1]) - a) * f;
 }
-function axisMorph(axis) { return axis === 'y' ? (params.morphY || 0) : (params.morphX || 0); }
+// The axis's morph position. `type` is its integer part, kept in step by
+// setWaveMorph(); it is the fallback for a patch saved before Morph existed.
+function axisMorph(axis, type) {
+  const v = axis === 'y' ? params.morphY : params.morphX;
+  if (v !== undefined && v !== null) return v;
+  const i = WAVE_ORDER.indexOf(type);
+  return i < 0 ? 0 : i;
+}
+// waveTypeX / waveTypeY are the integer part of the morph position. LFOs and
+// preset glides write the position straight into params, so the two are
+// re-derived once a frame rather than at every write site.
+let _lastMorphX = NaN, _lastMorphY = NaN;
+function syncWaveTypesFromMorph() {
+  const mx = params.morphX || 0, my = params.morphY || 0;
+  waveTypeX = WAVE_ORDER[Math.max(0, Math.min(MORPH_MAX, Math.floor(mx + 1e-6)))];
+  waveTypeY = WAVE_ORDER[Math.max(0, Math.min(MORPH_MAX, Math.floor(my + 1e-6)))];
+  if (mx !== _lastMorphX) { _lastMorphX = mx; updateWaveButtons('x'); }
+  if (my !== _lastMorphY) { _lastMorphY = my; updateWaveButtons('y'); }
+}
 
 // Warp — the phase bend from Ableton Wavetable's oscillator. The cycle's own
 // clock is bent by p → p^k, which fixes both ends of the cycle (so the wave stays
@@ -2426,8 +2462,7 @@ function processWave(carrierArg, freqT, type, axis) {
   const rOther = axis === 'x' ? (params.fy / params.fx) : (params.fx / params.fy);
   if (params.crossFm > 0.0001) {
     const otherType = axis === 'x' ? waveTypeY : waveTypeX;
-    const otherMorph = axis === 'x' ? (params.morphY || 0) : (params.morphX || 0);
-    ph += (params.crossFm / Math.max(0.25, rOther)) * morphWaveFn(rOther * freqT + modPhase, otherType, otherMorph);
+    ph += (params.crossFm / Math.max(0.25, rOther)) * morphWaveFn(rOther * freqT + modPhase, axisMorph(axis === 'x' ? 'y' : 'x', otherType));
   }
   // Sync: hard (phase reset) or soft (triangle reflect) at the synced ratio.
   // Optionally affects the X axis only.
@@ -2448,12 +2483,12 @@ function processWave(carrierArg, freqT, type, axis) {
   // feedback (the output nudges its own phase, classic FM-operator feedback
   // growl). Two refinement passes approximate the recursion statelessly, so every
   // sampling context computes the same value.
-  const mrp = axisMorph(axis);
-  let s = morphWaveFn(ph, type, mrp);
+  const mrp = axisMorph(axis, type);
+  let s = morphWaveFn(ph, mrp);
   if (params.fbAmt > 0.001) {
     const fb = params.fbAmt * 2.5;
-    s = morphWaveFn(ph + fb * s, type, mrp);
-    s = morphWaveFn(ph + fb * s, type, mrp);
+    s = morphWaveFn(ph + fb * s, mrp);
+    s = morphWaveFn(ph + fb * s, mrp);
   }
   // Waveshaping (tanh saturation), normalised. k rises from 0, where the transfer
   // curve IS the identity, so leaving zero is a fade-in rather than a step.
@@ -2466,8 +2501,7 @@ function processWave(carrierArg, freqT, type, axis) {
   // this is a pure X×Y product (petal / star symmetries).
   if (params.ringAmt > 0.001) {
     const otherType = axis === 'x' ? waveTypeY : waveTypeX;
-    const otherMorph = axis === 'x' ? (params.morphY || 0) : (params.morphX || 0);
-    s = s * ((1 - params.ringAmt) + params.ringAmt * morphWaveFn(rOther * freqT + modPhase, otherType, otherMorph));
+    s = s * ((1 - params.ringAmt) + params.ringAmt * morphWaveFn(rOther * freqT + modPhase, axisMorph(axis === 'x' ? 'y' : 'x', otherType)));
   }
   // Bitcrush: quantise the amplitude to 2^(bits−1) levels per polarity.
   if (params.crushBits < 15.5) {
@@ -3490,6 +3524,8 @@ function render(now) {
   // Apply BEFORE advancing, so one LFO modulating the other's rate actually bends
   // it, and before the phase step below, so Anim Speed is a real target too.
   applyLFOs();
+  // LFOs and preset glides write the morph position straight into params.
+  syncWaveTypesFromMorph();
   advanceLFOs(lfodt);
 
   // While LFO-modulated values are live in params, rebuild audio + sync sliders.
@@ -3613,17 +3649,40 @@ document.getElementById('anim-speed').addEventListener('input', e => {
 
 const WAVES = WAVE_ORDER;
 
-// Set a base waveform for an axis and reflect it in the toggle buttons + audio.
-function setBaseWave(axis, type) {
-  if (!WAVES.includes(type)) return;
-  if (axis === 'x') waveTypeX = type; else waveTypeY = type;
+// A wave button lights only when the morph slider is sitting exactly on it —
+// anywhere in between, none of the four is what you are hearing.
+const MORPH_EXACT = 0.005;
+function updateWaveButtons(axis) {
+  const p = (axis === 'y' ? params.morphY : params.morphX) || 0;
   document.querySelectorAll(`.wave-btn[data-axis="${axis}"]`).forEach(b => {
-    b.classList.toggle('active', b.dataset.bwave === type);
+    const i = WAVE_ORDER.indexOf(b.dataset.bwave);
+    const on = i >= 0 && Math.abs(p - i) < MORPH_EXACT;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
-  updateMorphLabels();   // Morph names the shape it is heading towards
+}
+// Move an axis to a position on the chain. The waveform "type" is the integer
+// part, so the buttons, the slider and the sampler can never disagree.
+function setWaveMorph(axis, pos, fromSlider) {
+  pos = Math.max(0, Math.min(MORPH_MAX, pos));
+  if (axis === 'y') params.morphY = pos; else params.morphX = pos;
+  const t = WAVE_ORDER[Math.max(0, Math.min(MORPH_MAX, Math.floor(pos + 1e-6)))];
+  if (axis === 'y') waveTypeY = t; else waveTypeX = t;
+  if (!fromSlider) {
+    const e = document.getElementById(axis === 'y' ? 'morph-y' : 'morph-x');
+    if (e) e.value = pos;
+  }
+  updateMorphLabels();
+  updateWaveButtons(axis);
   drawWavePreview();
   syncAudioParams();
   schedulePeriodicWaveUpdate();
+}
+// Set a base waveform for an axis — i.e. jump the morph to that exact shape.
+function setBaseWave(axis, type) {
+  const i = WAVE_ORDER.indexOf(type);
+  if (i < 0) return;
+  setWaveMorph(axis, i);
 }
 
 // Base wave selectors — independent per axis (X / Y)
@@ -3713,6 +3772,8 @@ function resetAll() {
   Object.keys(PARAM_DEFAULTS).forEach(k => { params[k] = PARAM_DEFAULTS[k]; });
   waveTypeX = 'sine';
   waveTypeY = 'sine';
+  params.morphX = 0;
+  params.morphY = 0;
   visualSwap = false;
   syncHard = true;
   syncSingle = false;
@@ -3996,8 +4057,8 @@ const VEL_RANGES = {
   fmAmount:  [0, 8],
   fmRatio:   [0.5, 8],
   warp:      [-1, 1],
-  morphX:    [0, 1],
-  morphY:    [0, 1],
+  morphX:    [0, 3],
+  morphY:    [0, 3],
   shapeAmt:  [0, 1],
   syncAmt:   [0.1, 2],
   foldDrive: [1, 8],
@@ -4059,8 +4120,8 @@ const PARAM_UI = {
   traceSpeed:    { slider: 'trace-speed',    disp: 'trace-speed-val',    fmt: v => v.toFixed(1) + '×' },
   untracedAlpha: { slider: 'untraced-alpha', disp: 'untraced-alpha-val', fmt: v => Math.round(v*100) + '%' },
   warp:      { slider: 'warp',       disp: 'warp-val',       fmt: v => fmtWarp(v) },
-  morphX:    { slider: 'morph-x',    disp: 'morph-x-val',    fmt: v => fmtMorph(v, 'x') },
-  morphY:    { slider: 'morph-y',    disp: 'morph-y-val',    fmt: v => fmtMorph(v, 'y') },
+  morphX:    { slider: 'morph-x',    disp: 'morph-x-val',    fmt: v => fmtMorph(v) },
+  morphY:    { slider: 'morph-y',    disp: 'morph-y-val',    fmt: v => fmtMorph(v) },
   shapeAmt:  { slider: 'shape-amt',  disp: 'shape-amt-val',  fmt: v => v.toFixed(2) },
   syncAmt:   { slider: 'sync-amt',   disp: 'sync-amt-val',   fmt: v => v.toFixed(2) },
   foldDrive: { slider: 'fold-drive', disp: 'fold-drive-val', fmt: v => fmtFold(v) },
@@ -4101,8 +4162,8 @@ const LFO_BINDINGS = {
   hue:   { get: () => strokeHSL.h, set: v => { strokeHSL.h = v; params.strokeColor = hslToHex(strokeHSL.h, strokeHSL.s, strokeHSL.l); } },
   sat:   { get: () => strokeHSL.s, set: v => { strokeHSL.s = v; params.strokeColor = hslToHex(strokeHSL.h, strokeHSL.s, strokeHSL.l); } },
   light: { get: () => strokeHSL.l, set: v => { strokeHSL.l = v; params.strokeColor = hslToHex(strokeHSL.h, strokeHSL.s, strokeHSL.l); } },
-  waveX: { get: () => Math.max(0, WAVES.indexOf(waveTypeX)), set: v => { waveTypeX = WAVES[Math.max(0, Math.min(3, Math.round(v)))]; } },
-  waveY: { get: () => Math.max(0, WAVES.indexOf(waveTypeY)), set: v => { waveTypeY = WAVES[Math.max(0, Math.min(3, Math.round(v)))]; } },
+  waveX: { get: () => Math.round(params.morphX || 0), set: v => { const i = Math.max(0, Math.min(MORPH_MAX, Math.round(v))); params.morphX = i; waveTypeX = WAVE_ORDER[i]; } },
+  waveY: { get: () => Math.round(params.morphY || 0), set: v => { const i = Math.max(0, Math.min(MORPH_MAX, Math.round(v))); params.morphY = i; waveTypeY = WAVE_ORDER[i]; } },
   animSpeed: { get: () => animSpeed, set: v => { animSpeed = v; } },
   lfo0Rate:  { get: () => lfos[0].freq,  set: v => { lfos[0].freq = v; } },
   lfo0Depth: { get: () => lfos[0].depth, set: v => { lfos[0].depth = v; } },
@@ -5042,28 +5103,25 @@ SYNTH_SLIDERS.forEach(([id, key, fmt]) => {
 
 
 // ── Waveform morph (per axis) ────────────────────────────────────────────────
-// The read-out names the shape being morphed INTO, which is the only thing the
-// number on its own doesn't tell you.
-function morphTargetLabel(type) {
-  const i = WAVE_ORDER.indexOf(type);
-  return WAVE_LABELS[WAVE_ORDER[((i < 0 ? 0 : i) + 1) % WAVE_ORDER.length]];
-}
-function fmtMorph(v, axis) {
-  if (!(v > 0.005)) return 'off';
-  return Math.round(v * 100) + '% → ' + morphTargetLabel(axis === 'y' ? waveTypeY : waveTypeX);
+// On a landmark the read-out is just the shape's name; between two it names the
+// pair and how far along it is.
+function fmtMorph(v) {
+  const p = Math.max(0, Math.min(MORPH_MAX, v || 0));
+  const near = Math.round(p);
+  if (Math.abs(p - near) < MORPH_EXACT) return WAVE_LABELS[WAVE_ORDER[near]];
+  const lo = Math.floor(p);
+  return WAVE_LABELS[WAVE_ORDER[lo]] + '→' + WAVE_LABELS[WAVE_ORDER[lo + 1]]
+       + ' ' + Math.round((p - lo) * 100) + '%';
 }
 function updateMorphLabels() {
   const x = document.getElementById('morph-x-val');
-  if (x) x.textContent = fmtMorph(params.morphX || 0, 'x');
+  if (x) x.textContent = fmtMorph(params.morphX || 0);
   const y = document.getElementById('morph-y-val');
-  if (y) y.textContent = fmtMorph(params.morphY || 0, 'y');
+  if (y) y.textContent = fmtMorph(params.morphY || 0);
 }
-[['morph-x', 'morphX', 'x'], ['morph-y', 'morphY', 'y']].forEach(([id, key, axis]) => {
+[['morph-x', 'x'], ['morph-y', 'y']].forEach(([id, axis]) => {
   document.getElementById(id).addEventListener('input', e => {
-    params[key] = parseFloat(e.target.value);
-    updateMorphLabels();
-    drawWavePreview();
-    schedulePeriodicWaveUpdate();
+    setWaveMorph(axis, parseFloat(e.target.value), true);
   });
 });
 
@@ -5440,6 +5498,7 @@ function tickLFOSliders(now) {
   keys.forEach(key => {
     const m = PARAM_UI[key];
     if (!m) return;
+    if (key === 'morphX' || key === 'morphY') updateWaveButtons(key === 'morphY' ? 'y' : 'x');
     const el = document.getElementById(m.slider);
     const disp = document.getElementById(m.disp);
     if (el) el.value = params[key];
@@ -5534,8 +5593,8 @@ const MAP_TARGETS = {
   fmAmount:  { label:'FM Amount',     min:0,    max:8,              apply:_synthApply('fmAmount','fm-amount','fm-amount-val',x=>x.toFixed(1)) },
   fmRatio:   { label:'FM Ratio',      min:0.5,  max:8,              apply:v => setRatioParam('fmRatio','fm-ratio','fm-ratio-val',v) },
   warp:      { label:'Warp',          min:-1,   max:1,              apply:_synthApply('warp','warp','warp-val',fmtWarp) },
-  morphX:    { label:'X Wave Morph',  min:0,    max:1,              apply:v => { params.morphX = v; const e=document.getElementById('morph-x'); if(e)e.value=v; updateMorphLabels(); drawWavePreview(); schedulePeriodicWaveUpdate(); } },
-  morphY:    { label:'Y Wave Morph',  min:0,    max:1,              apply:v => { params.morphY = v; const e=document.getElementById('morph-y'); if(e)e.value=v; updateMorphLabels(); drawWavePreview(); schedulePeriodicWaveUpdate(); } },
+  morphX:    { label:'X Wave Morph',  min:0,    max:3,              apply:v => setWaveMorph('x', v) },
+  morphY:    { label:'Y Wave Morph',  min:0,    max:3,              apply:v => setWaveMorph('y', v) },
   shapeAmt:  { label:'Waveshape',     min:0,    max:1,              apply:_synthApply('shapeAmt','shape-amt','shape-amt-val',x=>x.toFixed(2)) },
   syncAmt:   { label:'Sync Ratio',    min:0.1,  max:2,   step:0.05, apply:_synthApply('syncAmt','sync-amt','sync-amt-val',x=>x.toFixed(2)) },
   foldDrive: { label:'Fold',          min:1,    max:8,              apply:_synthApply('foldDrive','fold-drive','fold-drive-val',fmtFold) },
@@ -6073,7 +6132,7 @@ function pwTick(now) {
 // ─── PRESET EXPORT / IMPORT ───────────────────────────────────────────────────
 function serializePreset() {
   return {
-    app: 'lissajous', version: 3,
+    app: 'lissajous', version: 4,
     params: { ...params },
     waveTypeX, waveTypeY, visualSwap, audioStereo, syncHard, syncSingle,
     filterType, phaseModulators,
@@ -6101,8 +6160,6 @@ function refreshAllControls() {
   setS('fy', params.fy, 'fy-val', v => Number.isInteger(v) ? v : v.toFixed(1));
   setS('phase', params.phase, 'phase-val', v => v.toFixed(2) + 'π');
   setS('phase-y', params.phaseY ?? 0, 'phase-y-val', v => v.toFixed(2) + 'π');
-  setS('morph-x', params.morphX ?? 0);
-  setS('morph-y', params.morphY ?? 0);
   document.getElementById('bg-color').value = params.bgColor;
   applyPageBg();
   setS('line-width', params.lineWidth, 'line-width-val', v => v.toFixed(1));
@@ -6110,9 +6167,8 @@ function refreshAllControls() {
   applyStrokeHSL();
   updateSwapBtn();
   applyAudioChannelMode();
-  setBaseWave('x', waveTypeX);
-  setBaseWave('y', waveTypeY);
-  updateMorphLabels();
+  setWaveMorph('x', params.morphX ?? Math.max(0, WAVE_ORDER.indexOf(waveTypeX)));
+  setWaveMorph('y', params.morphY ?? Math.max(0, WAVE_ORDER.indexOf(waveTypeY)));
   setModWave('fm', params.fmWave || 'sine');
   setModWave('am', params.amWave || 'sine');
   setModAxis('fm', params.fmAxis ?? 0);
@@ -6169,6 +6225,15 @@ function applyPresetData(d) {
   params.phase = keepPhase;
   if (d.waveTypeX) waveTypeX = d.waveTypeX;
   if (d.waveTypeY) waveTypeY = d.waveTypeY;
+  // Format 4 made Morph an absolute position on SIN→TRI→SAW→SQR. Before that it
+  // was an offset from the named waveform (and before Morph existed at all, the
+  // waveform was the whole story) — either way, the position is the waveform's
+  // index plus whatever offset was stored.
+  if (!(d.version >= 4)) {
+    const base = t => Math.max(0, WAVE_ORDER.indexOf(t));
+    params.morphX = Math.min(MORPH_MAX, base(waveTypeX) + ((d.params && d.params.morphX) || 0));
+    params.morphY = Math.min(MORPH_MAX, base(waveTypeY) + ((d.params && d.params.morphY) || 0));
+  }
   if (typeof d.visualSwap === 'boolean') visualSwap = d.visualSwap;
   if (typeof d.audioStereo === 'boolean') audioStereo = d.audioStereo;
   if (typeof d.syncHard === 'boolean') syncHard = d.syncHard;
@@ -6472,8 +6537,8 @@ EVOLVE_KEYS.forEach(k => { evolveInclude[k] = !EVOLVE_DEFAULT_OFF.has(k); });
 function readTarget(key) {
   if (LFO_BINDINGS[key]) return LFO_BINDINGS[key].get();
   switch (key) {
-    case 'waveX': return Math.max(0, WAVES.indexOf(waveTypeX));
-    case 'waveY': return Math.max(0, WAVES.indexOf(waveTypeY));
+    case 'waveX': return Math.round(params.morphX || 0);
+    case 'waveY': return Math.round(params.morphY || 0);
     case 'lfo0Rate':  return lfos[0].freq;
     case 'lfo0Depth': return lfos[0].depth;
     case 'lfo1Rate':  return lfos[1].freq;
@@ -6698,8 +6763,12 @@ function setMorphStepMode(m) {
 // is meaningless (ratios would explode the figure's period mid-glide).
 // 'phase' is excluded entirely (never recalled — see applyPresetData) so the
 // running animation stays continuous across a preset change.
+// morphX / morphY are continuous numbers, but they ARE the waveform now — the
+// wave types are derived from them — so they belong with the stepped set, or a
+// recall would slide the timbre through two other shapes on its way and IGNORE
+// would stop protecting the waveform it promises to leave alone.
 const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurface', 'trailMode', 'trailCount', 'm4Rotate', 'phase',
-                                'depthSrc', 'depthShade', 'showShadow']);
+                                'depthSrc', 'depthShade', 'showShadow', 'morphX', 'morphY']);
 // The rest of a patch's stepped state lives outside `params` — the waveforms, the
 // filter type, the view toggles. Same treatment, same list.
 const MORPH_DISCRETE_TOP = ['waveTypeX', 'waveTypeY', 'visualSwap', 'audioStereo', 'syncHard',
