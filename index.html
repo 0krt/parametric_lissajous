@@ -1453,9 +1453,8 @@
         </div>
       </div>
       <canvas class="wave-preview" id="wave-preview" width="208" height="28"></canvas>
-      <button class="map-add-btn" id="btn-export-wav" style="margin-top:8px">⤓ Export Single Cycle WAV</button>
 
-      <div class="mod-group">
+      <div class="mod-group" data-axis="amAxis">
         <div class="vel-row"><span class="vel-label">AM</span></div>
         <div class="param-row">
           <div class="param-header"><label>Depth</label><span class="val" id="am-amt-val">0.0</span></div>
@@ -1472,15 +1471,9 @@
           <button class="mod-wave-btn" data-mod="am" data-mwave="sawtooth">SAW</button>
           <button class="mod-wave-btn" data-mod="am" data-mwave="square">SQR</button>
         </div>
-        <div class="param-header" style="margin-bottom:4px"><label>Apply to</label></div>
-        <div class="lfo-wave-toggle mod-axis-toggle">
-          <button class="mod-axis-btn active" data-mod="am" data-maxis="0" aria-pressed="true">BOTH</button>
-          <button class="mod-axis-btn" data-mod="am" data-maxis="1" aria-pressed="false">X</button>
-          <button class="mod-axis-btn" data-mod="am" data-maxis="2" aria-pressed="false">Y</button>
-        </div>
       </div>
 
-      <div class="mod-group">
+      <div class="mod-group" data-axis="fmAxis">
         <div class="vel-row"><span class="vel-label">FM</span></div>
         <div class="param-row">
           <div class="param-header"><label>Amount</label><span class="val" id="fm-amount-val">0.0</span></div>
@@ -1497,15 +1490,9 @@
           <button class="mod-wave-btn" data-mod="fm" data-mwave="sawtooth">SAW</button>
           <button class="mod-wave-btn" data-mod="fm" data-mwave="square">SQR</button>
         </div>
-        <div class="param-header" style="margin-bottom:4px"><label>Apply to</label></div>
-        <div class="lfo-wave-toggle mod-axis-toggle">
-          <button class="mod-axis-btn active" data-mod="fm" data-maxis="0" aria-pressed="true">BOTH</button>
-          <button class="mod-axis-btn" data-mod="fm" data-maxis="1" aria-pressed="false">X</button>
-          <button class="mod-axis-btn" data-mod="fm" data-maxis="2" aria-pressed="false">Y</button>
-        </div>
       </div>
 
-      <div class="mod-group">
+      <div class="mod-group" data-axis="crossAxis">
         <div class="vel-row"><span class="vel-label">Cross (X ↔ Y)</span></div>
         <div class="param-row">
           <div class="param-header"><label>Cross FM</label><span class="val" id="cross-fm-val">0.00</span></div>
@@ -1517,7 +1504,7 @@
         </div>
       </div>
 
-      <div class="mod-group">
+      <div class="mod-group" data-axis="shapeAxis">
         <div class="vel-row"><span class="vel-label">Waveshape</span></div>
         <div class="param-row">
           <div class="param-header"><label>Drive</label><span class="val" id="shape-amt-val">0.00</span></div>
@@ -1525,7 +1512,7 @@
         </div>
       </div>
 
-      <div class="mod-group">
+      <div class="mod-group" data-axis="fbAxis">
         <div class="vel-row"><span class="vel-label">Feedback</span></div>
         <div class="param-row">
           <div class="param-header"><label>Amount</label><span class="val" id="fb-amt-val">0.00</span></div>
@@ -1533,7 +1520,7 @@
         </div>
       </div>
 
-      <div class="mod-group">
+      <div class="mod-group" data-axis="warpAxis">
         <div class="vel-row"><span class="vel-label">Warp &amp; Fold</span></div>
         <div class="param-row">
           <div class="param-header"><label>Warp</label><span class="val" id="warp-val">0.0 %</span></div>
@@ -1564,7 +1551,7 @@
         </div>
       </div>
 
-      <div class="mod-group">
+      <div class="mod-group" data-axis="crushAxis">
         <div class="vel-row"><span class="vel-label">Crush</span></div>
         <div class="param-row">
           <div class="param-header"><label>Bits</label><span class="val" id="crush-bits-val">off</span></div>
@@ -1576,7 +1563,7 @@
         </div>
       </div>
 
-      <div class="mod-group">
+      <div class="mod-group" data-axis="noiseAxis">
         <div class="vel-row"><span class="vel-label">Noise (waveform)</span></div>
         <div class="param-row">
           <div class="param-header"><label>Amount</label><span class="val" id="noise-amt-val">0.000</span></div>
@@ -1584,7 +1571,7 @@
         </div>
       </div>
 
-      <div class="mod-group">
+      <div class="mod-group" data-axis="filterAxis">
         <div class="vel-row"><span class="vel-label">Filter (final stage)</span></div>
         <div class="wave-toggle" style="margin-bottom:8px">
           <button class="wave-btn active" data-filter="lowpass">LP</button>
@@ -1602,7 +1589,7 @@
         </div>
       </div>
 
-      <div class="mod-group">
+      <div class="mod-group" data-axis="syncAxis">
         <div class="vel-row"><span class="vel-label">Sync</span></div>
         <div class="param-row">
           <div class="param-header"><label>Ratio</label><span class="val" id="sync-amt-val">1.00</span></div>
@@ -1610,7 +1597,6 @@
         </div>
         <div style="display:flex;gap:16px;margin-top:2px">
           <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--label);cursor:pointer"><input type="checkbox" id="sync-hard" checked style="accent-color:var(--accent2);cursor:pointer">hard sync</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--label);cursor:pointer"><input type="checkbox" id="sync-single" style="accent-color:var(--accent2);cursor:pointer">X only</label>
         </div>
       </div>
 
@@ -1837,6 +1823,28 @@
           <span style="color:var(--muted);font-size:10px;letter-spacing:0.06em">L &nbsp;<span id="audio-fx-hz" style="color:var(--label)">300 Hz</span></span>
           <span style="color:var(--muted);font-size:10px;letter-spacing:0.06em">R &nbsp;<span id="audio-fy-hz" style="color:var(--label)">200 Hz</span></span>
         </div>
+        <div class="checkbox-row" style="margin-top:10px">
+          <input type="checkbox" id="eq-loudness" checked>
+          <label for="eq-loudness">Equal-loudness weighting</label>
+        </div>
+        <div class="param-row" id="eq-loud-depth-row">
+          <div class="param-header"><label>Amount</label><span class="val" id="eq-loud-depth-val">100%</span></div>
+          <input type="range" id="eq-loud-depth" min="0" max="1" step="0.01" value="1">
+        </div>
+        <div class="info-text" data-info-label="equal-loudness weighting">
+          The ear is far less sensitive at the bottom of its range than in the
+          middle, so sweeping a ratio from 1 to 16 over a 100 Hz base walks from
+          nearly inaudible to piercing without the Volume slider moving. Each
+          oscillator is weighted by its own fundamental against the
+          <strong>ISO 226 60-phon contour</strong>, which flattens that out: the
+          two axes of a wide interval arrive at comparable loudness, and sweeping
+          a frequency no longer sweeps the level with it.
+          The curve only ever <em>attenuates</em> — the correction is normalised so
+          nothing is ever boosted above unity — so switching it on cannot clip the
+          output. It costs headroom instead, which Volume gets back.
+          It weights the <em>fundamental</em>, not each harmonic, so it evens out
+          the pitch of a note rather than the spectrum inside it.
+        </div>
       </div>
 
       <!-- External input controls (hidden when the internal generator is selected) -->
@@ -1863,8 +1871,9 @@
         </div>
         <div class="info-text" data-info-label="the external audio input">
           External input <strong>replaces</strong> the internal generator (exclusive — no
-          mixing) and is captured in video recordings at full level — Volume, Monitor
-          level and mute affect only the speakers, never the recording. For
+          mixing) and is captured in video recordings. <strong>Volume</strong> now
+          shapes the recording as well as the speakers; Monitor level and mute still
+          affect the speakers alone, so you can record with them silent. For
           system/desktop audio pick a loopback device (e.g. BlackHole, Loopback).
         </div>
         <div id="ain-protocol-note" style="font-size:11px;color:var(--warn);margin-top:6px;line-height:1.55;display:none" role="status"></div>
@@ -1882,13 +1891,48 @@
         <input type="checkbox" id="rec-show-frame">
         <label for="rec-show-frame">Show frame preview</label>
       </div>
-      <div class="info-text" data-info-label="video recording">
-        Recording captures exactly what the canvas shows — construction view included
-        when it's on. The framing's <strong>Zoom</strong> now lives with the rest of
-        the figure's view controls, under <em>Figure ▸ View</em>.
+      <div class="param-row">
+        <div class="param-header"><label>Fade in</label><span class="val" id="rec-fade-in-val">off</span></div>
+        <input type="range" id="rec-fade-in" min="0" max="10" step="0.1" value="0">
+      </div>
+      <div class="param-row">
+        <div class="param-header"><label>Fade out</label><span class="val" id="rec-fade-out-val">off</span></div>
+        <input type="range" id="rec-fade-out" min="0" max="10" step="0.1" value="0">
+      </div>
+      <div class="info-text" data-info-label="the recording fades">
+        The clip opens out of, and closes back into, the
+        <strong>background colour</strong> — not black — so it starts and ends on
+        the same flat field the figure sits on. The audio rides the same ramp.
+        A fade-out means <strong>stop is not instant</strong>: the recording has to
+        keep rolling for the length of the fade, so the button shows
+        <em>fading</em> and saves the file when it lands.
       </div>
       <button class="map-add-btn" id="rec-toggle" style="margin-top:8px">● record</button>
+      <div class="info-text" data-info-label="video recording">
+        Recording captures exactly what the canvas shows — construction view included
+        when it's on. The framing's <strong>Zoom</strong> lives with the rest of the
+        figure's view controls, under <em>Figure ▸ View</em>, and <strong>Volume</strong>
+        now applies to the recorded audio as well as the speakers (the monitor level
+        and mute still do not — you can record with the speakers silent).
+      </div>
       <div id="rec-status" style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5" role="status"></div>
+
+      <div class="subsection-label">Wavetable Export</div>
+      <div class="param-row">
+        <div class="param-header"><label>Root note</label><span class="val" id="wav-root-val">C0 · 33.5 kHz</span></div>
+        <input type="range" id="wav-root" min="0" max="48" step="1" value="12">
+      </div>
+      <button class="map-add-btn" id="btn-export-wav" style="margin-top:8px">⤓ Export Single Cycle WAV</button>
+      <div class="info-text" data-info-label="the single-cycle export">
+        Writes <strong>one cycle</strong> of each axis's processed waveform as a
+        2048-sample WAV — the format wavetable synths and samplers expect. A
+        single cycle has no pitch of its own; what fixes it is the file's sample
+        rate, so the <strong>Root note</strong> sets that rate
+        (2048 × the note's frequency) and the file plays back at that pitch at
+        normal speed. <strong>C0</strong> is the usual convention for
+        single-cycle libraries; pick the note your sampler expects, or the one you
+        want the table to sound at untransposed.
+      </div>
     </div>
 
     <div class="section" id="section-render">
@@ -1982,6 +2026,25 @@
         <div class="param-row">
           <div class="param-header"><label>Spacing</label><span class="val" id="trail-spacing-val">0.08π</span></div>
           <input type="range" id="trail-spacing" min="0.005" max="0.5" step="0.005" value="0.08">
+        </div>
+      </div>
+      <div id="trail-quality-row" style="display:none">
+        <div class="param-header" style="margin-bottom:4px"><label>Ghost detail</label></div>
+        <div class="wave-toggle" style="margin-bottom:6px">
+          <button class="wave-btn active" data-trailq="auto" title="Full detail while the frame rate allows it, coarser when it doesn't">AUTO</button>
+          <button class="wave-btn" data-trailq="full" title="Always full resolution, however slow">FULL</button>
+          <button class="wave-btn" data-trailq="fast" title="Always coarse — fastest">FAST</button>
+        </div>
+        <div class="info-text" data-info-label="ghost detail">
+          A KEEP trail's cost is the ink it lays down, not the arithmetic: every
+          copy is stroked twice (once to clear its own path, once to draw it), so
+          a long figure at sixteen copies fills the frame many times over. The
+          copies are therefore rasterised into their own smaller layer and scaled
+          back up — half the linear size is a quarter of the work — while the live
+          curve is drawn straight onto the canvas at full resolution and stays
+          sharp. <strong>AUTO</strong> keeps the copies pixel-sharp while the
+          frame rate allows it and steps them down only when frames actually run
+          long, so you pay for detail only where it is affordable.
         </div>
       </div>
       <div class="info-text" data-info-label="trail modes">
@@ -2243,6 +2306,14 @@ let params = {
   fmRatio: 2,     // frequency modulation ratio
   fmWave: 'sine', // FM modulator waveform
   fmAxis: 0,      // which axis FM is applied to: 0 = both, 1 = X only, 2 = Y only
+  crossAxis: 0,   // …and the same for every other synthesis stage (see AXIS_GROUPS)
+  shapeAxis: 0,
+  fbAxis: 0,
+  warpAxis: 0,
+  crushAxis: 0,
+  noiseAxis: 0,
+  filterAxis: 0,
+  syncAxis: 0,
   warp: 0,        // phase bend (Ableton Wavetable "Warp"): -1 = late, +1 = early
   shapeAmt: 0,    // waveshaping (tanh) drive
   syncAmt: 1,     // sync ratio (1 = off), range 0.1..2.0
@@ -2286,7 +2357,6 @@ const PARAM_DEFAULTS = JSON.parse(JSON.stringify(params));
 
 let visualSwap = false; // swaps X/Y in the visual presentation only
 let syncHard = true;    // true = hard sync (phase reset), false = soft sync (reflect)
-let syncSingle = false; // true = sync affects the X axis only
 
 // Output multimode filter
 let filterType = 'lowpass';            // lowpass | highpass | bandpass | notch
@@ -2434,6 +2504,23 @@ const TWO_PI = Math.PI * 2;
 function modOnAxis(mode, axis) {
   return mode === 0 || (mode === 1 ? axis === 'x' : axis === 'y');
 }
+// Every synthesis stage can be aimed at one axis instead of both. Aiming a stage
+// at a single side is what breaks the figure's symmetry: the same modulation on
+// both axes deforms them in lockstep and the figure keeps its shape.
+function onAxis(key, axis) { return modOnAxis(params[key] | 0, axis); }
+// key → the group label the toggle is built under. Order follows the sidebar.
+const AXIS_GROUPS = [
+  ['amAxis',     'AM'],
+  ['fmAxis',     'FM'],
+  ['crossAxis',  'Cross'],
+  ['shapeAxis',  'Waveshape'],
+  ['fbAxis',     'Feedback'],
+  ['warpAxis',   'Warp & Fold'],
+  ['crushAxis',  'Crush'],
+  ['noiseAxis',  'Noise'],
+  ['filterAxis', 'Filter'],
+  ['syncAxis',   'Sync'],
+];
 
 function processWave(carrierArg, freqT, type, axis) {
   type = type || waveTypeX;
@@ -2442,7 +2529,7 @@ function processWave(carrierArg, freqT, type, axis) {
   // is a deterministic function of the phase, so this steps the WHOLE output —
   // stepped audio, constellation-style figures. Stateless, so figure / preview /
   // wavetable stay identical.
-  if (params.crushRate > 0.005) {
+  if (params.crushRate > 0.005 && onAxis('crushAxis', axis)) {
     const steps = Math.max(3, Math.round(Math.pow(2, 8 - 6.5 * params.crushRate)));
     const q = TWO_PI / steps;
     carrierArg = Math.floor(carrierArg / q) * q;
@@ -2454,19 +2541,19 @@ function processWave(carrierArg, freqT, type, axis) {
   const modPhase = phaseModulators ? (carrierArg - freqT) : 0;
   let ph = carrierArg;
   // Frequency Modulation: true-FM style, index scales with 1/ratio
-  if (params.fmAmount > 0.0001 && modOnAxis(params.fmAxis | 0, axis)) ph += (params.fmAmount / params.fmRatio) * waveFn(params.fmRatio * freqT + modPhase, params.fmWave);
+  if (params.fmAmount > 0.0001 && onAxis('fmAxis', axis)) ph += (params.fmAmount / params.fmRatio) * waveFn(params.fmRatio * freqT + modPhase, params.fmWave);
   // Cross-axis FM: this axis's phase is modulated by the OTHER axis's carrier (its
   // base wave at its frequency ratio). Couples the two axes — small amounts smear /
   // precess the figure. The other axis's phase relative to this one is freqT scaled
   // by the frequency ratio between them, which holds in every sampling context.
   const rOther = axis === 'x' ? (params.fy / params.fx) : (params.fx / params.fy);
-  if (params.crossFm > 0.0001) {
+  if (params.crossFm > 0.0001 && onAxis('crossAxis', axis)) {
     const otherType = axis === 'x' ? waveTypeY : waveTypeX;
     ph += (params.crossFm / Math.max(0.25, rOther)) * morphWaveFn(rOther * freqT + modPhase, axisMorph(axis === 'x' ? 'y' : 'x', otherType));
   }
   // Sync: hard (phase reset) or soft (triangle reflect) at the synced ratio.
   // Optionally affects the X axis only.
-  if (Math.abs(params.syncAmt - 1) > 0.001 && (!syncSingle || axis === 'x')) {
+  if (Math.abs(params.syncAmt - 1) > 0.001 && onAxis('syncAxis', axis)) {
     const q = (ph / TWO_PI) * params.syncAmt;
     let phf;
     if (syncHard) {
@@ -2478,39 +2565,39 @@ function processWave(carrierArg, freqT, type, axis) {
     ph = phf * TWO_PI;
   }
   // Warp — bend the cycle's own clock before the shape is read from it.
-  if (params.warp) ph = warpPhase(ph, params.warp);
+  if (params.warp && onAxis('warpAxis', axis)) ph = warpPhase(ph, params.warp);
   // Base wave — morphed towards the next shape in the cycle, with optional phase
   // feedback (the output nudges its own phase, classic FM-operator feedback
   // growl). Two refinement passes approximate the recursion statelessly, so every
   // sampling context computes the same value.
   const mrp = axisMorph(axis, type);
   let s = morphWaveFn(ph, mrp);
-  if (params.fbAmt > 0.001) {
+  if (params.fbAmt > 0.001 && onAxis('fbAxis', axis)) {
     const fb = params.fbAmt * 2.5;
     s = morphWaveFn(ph + fb * s, mrp);
     s = morphWaveFn(ph + fb * s, mrp);
   }
   // Waveshaping (tanh saturation), normalised. k rises from 0, where the transfer
   // curve IS the identity, so leaving zero is a fade-in rather than a step.
-  if (params.shapeAmt > 0.0002) { const k = params.shapeAmt * 7; s = Math.tanh(s * k) / Math.tanh(k); }
+  if (params.shapeAmt > 0.0002 && onAxis('shapeAxis', axis)) { const k = params.shapeAmt * 7; s = Math.tanh(s * k) / Math.tanh(k); }
   // Fold — the bias offsets the input into the folder, breaking its symmetry
-  if (params.foldDrive > 1.001 || Math.abs(params.foldBias) > 0.001) s = foldValue(s * params.foldDrive + params.foldBias);
+  if ((params.foldDrive > 1.001 || Math.abs(params.foldBias) > 0.001) && onAxis('warpAxis', axis)) s = foldValue(s * params.foldDrive + params.foldBias);
   // AM (normalized)
-  if (params.amAmt > 0.001 && modOnAxis(params.amAxis | 0, axis)) s = s * (1 + params.amAmt * waveFn(params.amRatio * freqT + modPhase, params.amWave)) / (1 + params.amAmt);
+  if (params.amAmt > 0.001 && onAxis('amAxis', axis)) s = s * (1 + params.amAmt * waveFn(params.amRatio * freqT + modPhase, params.amWave)) / (1 + params.amAmt);
   // Ring mod between axes: multiply in the other axis's carrier. At full amount
   // this is a pure X×Y product (petal / star symmetries).
-  if (params.ringAmt > 0.001) {
+  if (params.ringAmt > 0.001 && onAxis('crossAxis', axis)) {
     const otherType = axis === 'x' ? waveTypeY : waveTypeX;
     s = s * ((1 - params.ringAmt) + params.ringAmt * morphWaveFn(rOther * freqT + modPhase, axisMorph(axis === 'x' ? 'y' : 'x', otherType)));
   }
   // Bitcrush: quantise the amplitude to 2^(bits−1) levels per polarity.
-  if (params.crushBits < 15.5) {
+  if (params.crushBits < 15.5 && onAxis('crushAxis', axis)) {
     const L = Math.pow(2, Math.max(0, params.crushBits - 1));
     s = Math.round(s * L) / L;
   }
   // Noise — visual only; live audio gets a dedicated white-noise source so the
   // periodic wavetable stays clean/periodic.
-  if (!_audioSampling && params.noiseAmt > 0.001) s += params.noiseAmt * (Math.random() * 2 - 1);
+  if (!_audioSampling && params.noiseAmt > 0.001 && onAxis('noiseAxis', axis)) s += params.noiseAmt * (Math.random() * 2 - 1);
   return s;
 }
 
@@ -2529,7 +2616,7 @@ function modComplexity() {
     + params.crushRate * 0.5;
 }
 
-function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
+function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg, resCap) {
   const { ax, fx, ay, fy, strokeColor, bgColor, lineWidth } = params;
   zoom = zoom || 1;
   // Base resolution from user setting (or override from caller)
@@ -2537,7 +2624,7 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
   const periodFactor = lcm(fx, fy) / Math.min(fx, fy);
   const modCx = modComplexity();
   const minPts = Math.ceil(Math.max(fx, fy) * periodFactor * 80 * Math.min(modCx, 10));
-  resolution = Math.min(Math.max(baseRes, minPts), 160000);
+  resolution = Math.min(Math.max(baseRes, minPts), resCap || 160000);
   // Trail persistence: instead of a hard clear, fade the previous frame by painting
   // a semi-transparent background — phosphor-style afterglow.
   if (!noBg) {
@@ -2565,13 +2652,27 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
   // In lift mode δ never reaches the sampler — it is applied downstream as a
   // rotation — so the sample set is phase-independent and the key drops it. That
   // also means the N copies of a KEEP trail sample ONCE between them, not N times.
-  const memoPhase = (lift ? -1 : phase) + 1000 * (params.phaseY || 0);
-  if (_figMemoPhase !== memoPhase || _figMemoRes !== resolution || _figMemoLift !== lift) {
+  const memoPhase = lift ? -1 : phase;
+  const xStale = _figMemoPhase !== memoPhase || _figMemoRes !== resolution || _figMemoLift !== lift;
+  // Y carries no δ, so a KEEP trail's N copies share ONE Y build instead of
+  // sampling an identical array N times.
+  const yKey = params.phaseY || 0;
+  if (_figMemoYRes !== resolution || _figMemoYKey !== yKey) {
+    _figMemoYRes = resolution; _figMemoYKey = yKey;
+    for (let i = 0; i <= resolution; i++) {
+      syArr[i] = processWave(fy * ((i / resolution) * span) + yKey * Math.PI,
+                             fy * ((i / resolution) * span), waveTypeY, 'y');
+    }
+    if (filterIsOn() && onAxis('filterAxis', 'y')) {
+      const wY = Math.PI * 2 * Math.min(0.49, (filterHarmonics() * fy * periodFactor) / resolution);
+      filterPeriodic(syArr, N, biquadCoeffs(filterType, wY, params.filterQ));
+    }
+  }
+  if (xStale) {
     _figMemoPhase = memoPhase; _figMemoRes = resolution; _figMemoLift = lift;
     for (let i = 0; i <= resolution; i++) {
       const t = (i / resolution) * span;
       sxArr[i] = processWave(fx * t + (lift ? 0 : phase * Math.PI), fx * t, waveTypeX, 'x');
-      syArr[i] = processWave(fy * t + params.phaseY * Math.PI, fy * t, waveTypeY, 'y');
     }
     // The depth coordinate: the SAME wave a quarter period ahead. For a sine that
     // is a cosine, so (x, z) rides a circle of radius ax and yawing the curve by
@@ -2583,13 +2684,10 @@ function drawLissajous(targetCtx, w, h, phase, resolution, zoom, noBg) {
         szArr[i] = processWave(fx * t + Math.PI / 2, fx * t, waveTypeX, 'x');
       }
     }
-    // ── Multimode filter + comb (final waveform stages) ────────────────────────
-    if (filterIsOn()) {
-      const HC = filterHarmonics();
-      const wX = Math.PI * 2 * Math.min(0.49, (HC * fx * periodFactor) / resolution);
-      const wY = Math.PI * 2 * Math.min(0.49, (HC * fy * periodFactor) / resolution);
+    // ── Multimode filter (final waveform stage) — X and the depth it carries ──
+    if (filterIsOn() && onAxis('filterAxis', 'x')) {
+      const wX = Math.PI * 2 * Math.min(0.49, (filterHarmonics() * fx * periodFactor) / resolution);
       filterPeriodic(sxArr, N, biquadCoeffs(filterType, wX, params.filterQ));
-      filterPeriodic(syArr, N, biquadCoeffs(filterType, wY, params.filterQ));
       // Depth gets the X axis's own coefficients: filtering it differently would
       // pull it out of quadrature and buckle the cylinder.
       if (lift) filterPeriodic(szArr, N, biquadCoeffs(filterType, wX, params.filterQ));
@@ -2763,6 +2861,7 @@ function figureMirrors() { return MIRROR_SETS[Math.max(0, Math.min(3, Math.round
 const _P = { x: 0, y: 0 };      // scratch point for drawLissajous
 let _figMemoPhase = NaN, _figMemoRes = -1;   // per-frame sample memo (see drawLissajous)
 let _figMemoLift = null;                     // ...and which depth mode built it
+let _figMemoYRes = -1, _figMemoYKey = NaN;   // Y is independent of δ — its own key
 let _unisonDrift = 0;           // unison ghost precession (cycles); advanced in render()
 // How far the unison ghosts sit from the main figure, in cycles. A small baseline
 // makes the doubling visible from Mix alone; Detune widens the separation and (via
@@ -2947,6 +3046,27 @@ function trailAlpha() {
 //         overlapping in the same colour.
 let _trCv = null, _trCtx = null;      // FADE: the persistence layer
 let _ghCv = null, _ghCtx = null;      // KEEP: this frame's ghosts
+// Ghost-layer scale. 'auto' walks it down only when frames actually run long,
+// so an affordable stack stays pixel-sharp and an unaffordable one stays fluid.
+let trailQuality = 'auto';            // 'auto' | 'full' | 'fast'
+const GH_SCALES = [1, 0.75, 0.5];   // auto never goes below half — FAST can
+let _ghStep = 0;                      // index into GH_SCALES, chosen adaptively
+let _ghScale = 1;                     // the scale the layer is currently built at
+let _frameAvg = 16.7;                 // rolling mean frame time, ms
+function ghostScale() {
+  if (trailQuality === 'full') return 1;
+  if (trailQuality === 'fast') return 0.4;
+  return GH_SCALES[_ghStep];
+}
+// Called once a frame with the last frame's duration. Hysteresis is wide (a
+// frame has to be clearly over or clearly under budget) so the picture cannot
+// oscillate between two sharpnesses.
+function tickTrailQuality(dtMs) {
+  _frameAvg += (Math.min(dtMs, 500) - _frameAvg) * 0.15;
+  if (trailQuality !== 'auto' || !(trailKeeps() && (params.trailCount || 0) >= 1)) return;
+  if (_frameAvg > 26 && _ghStep < GH_SCALES.length - 1) { _ghStep++; _frameAvg = 16.7; }
+  else if (_frameAvg < 11 && _ghStep > 0) { _ghStep--; _frameAvg = 16.7; }
+}
 
 function trailKeeps() { return Math.round(params.trailMode || 0) === 1; }
 function trailFades() { return !trailKeeps() && trailAlpha() < 0.999; }
@@ -2958,15 +3078,21 @@ function clearTrail() {
 }
 
 function _layer(which) {
+  // The ghost layer may be built smaller than the canvas; the fade layer is the
+  // persistence buffer and has to stay 1:1 or it would resample itself every frame.
+  const sc = which === 'tr' ? 1 : ghostScale();
+  const wantW = Math.max(1, Math.round(canvas.width * sc));
+  const wantH = Math.max(1, Math.round(canvas.height * sc));
   const cur = which === 'tr' ? _trCv : _ghCv;
-  if (!cur || cur.width !== canvas.width || cur.height !== canvas.height) {
+  if (!cur || cur.width !== wantW || cur.height !== wantH) {
     const cv = document.createElement('canvas');
-    cv.width = canvas.width; cv.height = canvas.height;
+    cv.width = wantW; cv.height = wantH;
     const c = cv.getContext('2d');
-    if (which === 'tr') { _trCv = cv; _trCtx = c; } else { _ghCv = cv; _ghCtx = c; }
-  }
+    if (which === 'tr') { _trCv = cv; _trCtx = c; } else { _ghCv = cv; _ghCtx = c; _ghScale = sc; }
+  } else if (which === 'gh') _ghScale = sc;
   const c = which === 'tr' ? _trCtx : _ghCtx;
-  c.setTransform(viewDpr, 0, 0, viewDpr, 0, 0);
+  const k = viewDpr * sc;
+  c.setTransform(k, 0, 0, k, 0, 0);
   c.imageSmoothingEnabled = true;
   return c;
 }
@@ -2987,7 +3113,11 @@ function beginGhostLayer() {
   const c = _layer('gh');
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.clearRect(0, 0, _ghCv.width, _ghCv.height);
-  c.setTransform(viewDpr, 0, 0, viewDpr, 0, 0);
+  // Restore the layer's OWN transform, which carries the ghost scale — resetting
+  // it to a bare dpr would draw the figure at 1/_ghScale of its size and then
+  // stretch that up again on the blit.
+  const k = viewDpr * _ghScale;
+  c.setTransform(k, 0, 0, k, 0, 0);
   return c;
 }
 function blitLayer(which) {
@@ -2995,20 +3125,25 @@ function blitLayer(which) {
   if (!cv) return;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(cv, 0, 0);
+  // A downscaled ghost layer is stretched back over the full canvas here.
+  if (which === 'gh' && (cv.width !== canvas.width || cv.height !== canvas.height)) {
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'low';
+    ctx.drawImage(cv, 0, 0, cv.width, cv.height, 0, 0, canvas.width, canvas.height);
+  } else ctx.drawImage(cv, 0, 0);
   ctx.restore();
 }
 
 // Draw the figure — whichever view is showing — into `target`, at a phase offset.
 // Ghosts also wind the spin back in proportion, so a rotating figure leaves a
 // rotational trail rather than a stack of copies at the same angle.
-function drawFigureInto(target, phase, res, zoom, phaseBack) {
+function drawFigureInto(target, phase, res, zoom, phaseBack, resCap) {
   const spinSave = rotSpinPhase;
   if (phaseBack && rotSpin) rotSpinPhase = rotSpinPhase - phaseBack * 62.5;   // deg per phase unit
   target.save();
   target.translate(figBox.x, figBox.y);
-  if (constructionView) drawMode4(target, figBox.size, figBox.size, phase, true, zoom, M4_FIGURE);
-  else drawLissajous(target, figBox.size, figBox.size, phase, res, zoom, true);
+  if (constructionView) drawMode4(target, figBox.size, figBox.size, phase, true, zoom, M4_FIGURE, resCap);
+  else drawLissajous(target, figBox.size, figBox.size, phase, res, zoom, true, resCap);
   target.restore();
   rotSpinPhase = spinSave;
 }
@@ -3018,14 +3153,14 @@ function drawFigureInto(target, phase, res, zoom, phaseBack) {
 // The clearance is only a little wider than the stroke: a fat brush would rub out
 // most of a neighbouring copy, since copies a small phase apart run close together
 // over much of their length.
-function eraseUnderFigure(target, phase, res, zoom, phaseBack) {
+function eraseUnderFigure(target, phase, res, zoom, phaseBack, resCap) {
   const lwSave = params.lineWidth;
   params.lineWidth = lwSave * 1.35 + 0.7;
   target.globalCompositeOperation = 'destination-out';
   // The clearance has to be fully opaque to actually clear, so the depth shading
   // (and the shadow, which is not part of the stroke being cleared) stand down.
   _eraseMode = true;
-  drawFigureInto(target, phase, res, zoom, phaseBack);
+  drawFigureInto(target, phase, res, zoom, phaseBack, resCap);
   _eraseMode = false;
   target.globalCompositeOperation = 'source-over';
   params.lineWidth = lwSave;
@@ -3057,7 +3192,7 @@ function drawWavePreview() {
     const n = w + 1;
     const buf = new Float64Array(n);
     for (let i = 0; i <= w; i++) { const t = (i / w) * Math.PI * 2 * CYC; buf[i] = processWave(t, t, type, axis); }
-    if (filterIsOn()) {
+    if (filterIsOn() && onAxis('filterAxis', axis)) {
       const wc = Math.PI * 2 * Math.min(0.49, (filterHarmonics() * CYC) / w);
       filterPeriodic(buf, n, biquadCoeffs(filterType, wc, params.filterQ));
     }
@@ -3098,7 +3233,7 @@ let _m4BufZ = new Float64Array(0);         // lift mode only: the quadrature (de
 // draws the diagram itself (separators, generator strips, projection lines, the
 // three moving dots), which must never trail — a smeared ruler is not a ruler.
 const M4_ALL = 0, M4_FIGURE = 1, M4_CHROME = 2;
-function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pre-dpr) pixels
+function drawMode4(ctx, w, h, phase, noBg, zoom, part, resCap) {  // w,h are logical (pre-dpr) pixels
   part = part || M4_ALL;
   const wantFigure = part !== M4_CHROME, wantChrome = part !== M4_FIGURE;
   const { ax, fx, ay, fy, strokeColor, bgColor, lineWidth } = params;
@@ -3120,7 +3255,7 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
   const T = TWO_PI / gcd(fx, fy);
   const t = mode4T;
 
-  const res = Math.min(Math.max(params.resolution, Math.ceil(Math.max(fx, fy) * 96)), 40000);
+  const res = Math.min(Math.max(params.resolution, Math.ceil(Math.max(fx, fy) * 96)), resCap || 40000);
 
   // Background (trail-aware, same afterglow behaviour as the main view). Skipped
   // when the caller has already painted the backdrop across the whole window.
@@ -3236,9 +3371,10 @@ function drawMode4(ctx, w, h, phase, noBg, zoom, part) {  // w,h are logical (pr
       const HC = filterHarmonics();
       const wX = Math.PI * 2 * Math.min(0.49, (HC * cyclesX) / res);
       const wY = Math.PI * 2 * Math.min(0.49, (HC * cyclesY) / res);
-      filterPeriodic(ampXArr, N, biquadCoeffs(filterType, wX, params.filterQ));
-      filterPeriodic(ampYArr, N, biquadCoeffs(filterType, wY, params.filterQ));
-      if (m4Lift) filterPeriodic(ampZArr, N, biquadCoeffs(filterType, wX, params.filterQ));
+      const f4X = onAxis('filterAxis', 'x'), f4Y = onAxis('filterAxis', 'y');
+      if (f4X) filterPeriodic(ampXArr, N, biquadCoeffs(filterType, wX, params.filterQ));
+      if (f4Y) filterPeriodic(ampYArr, N, biquadCoeffs(filterType, wY, params.filterQ));
+      if (m4Lift && f4X) filterPeriodic(ampZArr, N, biquadCoeffs(filterType, wX, params.filterQ));
     }
   }
   // X/Y swap mirrors the main view; sample the filtered arrays by time.
@@ -3408,8 +3544,8 @@ function woBuild() {
     const g = gcd(fx, fy), HC = filterHarmonics();
     const wX = Math.PI * 2 * Math.min(0.49, (HC * (fx / g)) / WO_N);
     const wY = Math.PI * 2 * Math.min(0.49, (HC * (fy / g)) / WO_N);
-    filterPeriodic(_woBufX, WO_N + 1, biquadCoeffs(filterType, wX, params.filterQ));
-    filterPeriodic(_woBufY, WO_N + 1, biquadCoeffs(filterType, wY, params.filterQ));
+    if (onAxis('filterAxis', 'x')) filterPeriodic(_woBufX, WO_N + 1, biquadCoeffs(filterType, wX, params.filterQ));
+    if (onAxis('filterAxis', 'y')) filterPeriodic(_woBufY, WO_N + 1, biquadCoeffs(filterType, wY, params.filterQ));
   }
 }
 
@@ -3465,6 +3601,7 @@ function render(now) {
 
   if (now - lastDrawAt < FRAME_MS - 1) return;
   const lfodt = Math.min((now - lastDrawAt) / 1000, 0.1); // actual elapsed seconds, clamped
+  tickTrailQuality(now - lastDrawAt);
   lastDrawAt = now;
 
   // Self-heal the bitmap size. A browser can report a degenerate viewport in the
@@ -3557,7 +3694,7 @@ function render(now) {
   if (constructionView && animating) animPhase = (animPhase + 0.004 * animSpeed) % 2;
   const drawPhase = constructionView ? (animating ? animPhase : params.phase) : phase;
   const zoom = Math.max(ZOOM_MIN, recZoom);
-  _m4MemoPhase = NaN; _figMemoPhase = NaN;    // the sample memos are per-frame
+  _m4MemoPhase = NaN; _figMemoPhase = NaN; _figMemoYRes = -1;   // the sample memos are per-frame
 
   paintBackdrop();
 
@@ -3575,10 +3712,10 @@ function render(now) {
     // crosses. The live curve does the same, then is drawn on the canvas itself.
     for (let k = n; k >= 1; k--) {
       const kp = drawPhase - k * d;
-      eraseUnderFigure(g, kp, gRes, zoom, k * d);
-      drawFigureInto(g, kp, gRes, zoom, k * d);
+      eraseUnderFigure(g, kp, gRes, zoom, k * d, gRes);
+      drawFigureInto(g, kp, gRes, zoom, k * d, gRes);
     }
-    eraseUnderFigure(g, drawPhase, gRes, zoom, 0);
+    eraseUnderFigure(g, drawPhase, gRes, zoom, 0, gRes);
     blitLayer('gh');
     drawFigureInto(ctx, drawPhase, res, zoom, 0);
   } else if (trailFades()) {
@@ -3705,10 +3842,14 @@ document.querySelectorAll('.mod-wave-btn').forEach(btn => {
 });
 
 // Modulator (FM / AM) axis targeting — 0 = both, 1 = X only, 2 = Y only.
-function setModAxis(mod, a) {
+// Set a stage's axis target. `key` is the params key (fmAxis, foldAxis, …); the
+// rows themselves were built by buildAxisToggles() from AXIS_GROUPS, so a new
+// stage needs one line there and nothing here.
+function setAxisTarget(key, a) {
+  if (params[key] === undefined) return;
   a = Math.max(0, Math.min(2, Math.round(a)));
-  if (mod === 'fm') params.fmAxis = a; else if (mod === 'am') params.amAxis = a; else return;
-  document.querySelectorAll(`.mod-axis-btn[data-mod="${mod}"]`).forEach(b => {
+  params[key] = a;
+  document.querySelectorAll(`.mod-axis-btn[data-axiskey="${key}"]`).forEach(b => {
     const on = parseInt(b.dataset.maxis) === a;
     b.classList.toggle('active', on);
     b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -3716,9 +3857,39 @@ function setModAxis(mod, a) {
   drawWavePreview();
   schedulePeriodicWaveUpdate();
 }
-document.querySelectorAll('.mod-axis-btn').forEach(btn => {
-  btn.addEventListener('click', () => setModAxis(btn.dataset.mod, parseInt(btn.dataset.maxis)));
-});
+// Back-compat shim for the two that used to be addressed by modulator name.
+function setModAxis(mod, a) { setAxisTarget(mod === 'fm' ? 'fmAxis' : 'amAxis', a); }
+
+const AXIS_LABELS = ['BOTH', 'X', 'Y'];
+function buildAxisToggles() {
+  document.querySelectorAll('.mod-group[data-axis]').forEach(group => {
+    const key = group.dataset.axis;
+    if (params[key] === undefined || group.querySelector('.mod-axis-toggle')) return;
+    const hdr = document.createElement('div');
+    hdr.className = 'param-header';
+    hdr.style.marginBottom = '4px';
+    hdr.innerHTML = '<label>Apply to</label>';
+    const row = document.createElement('div');
+    row.className = 'lfo-wave-toggle mod-axis-toggle';
+    AXIS_LABELS.forEach((label, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mod-axis-btn' + (i === (params[key] | 0) ? ' active' : '');
+      b.dataset.axiskey = key;
+      b.dataset.maxis = i;
+      b.textContent = label;
+      b.setAttribute('aria-pressed', i === (params[key] | 0) ? 'true' : 'false');
+      b.addEventListener('click', () => setAxisTarget(key, i));
+      row.appendChild(b);
+    });
+    // Sit above any explanatory prose in the group rather than below it, so the
+    // controls stay together and the note stays last.
+    const prose = group.querySelector('.info-text');
+    if (prose) { group.insertBefore(hdr, prose); group.insertBefore(row, prose); }
+    else { group.appendChild(hdr); group.appendChild(row); }
+  });
+}
+function refreshAxisToggles() { AXIS_GROUPS.forEach(([k]) => setAxisTarget(k, params[k] | 0)); }
 
 function updateStatus() {
   const fx = params.fx, fy = params.fy, ph = animating ? animPhase : params.phase;
@@ -3776,7 +3947,6 @@ function resetAll() {
   params.morphY = 0;
   visualSwap = false;
   syncHard = true;
-  syncSingle = false;
   filterType = 'lowpass';
   phaseModulators = false;
   rotSpin = false;
@@ -4198,7 +4368,8 @@ function lfoSet(key, v) {
 let LFO_TARGET_OPTIONS = [];   // filled by completeVelRanges(), below MAP_TARGETS
 // Keys whose modulation requires rebuilding the periodic wavetable (noise and the
 // unison pair are live audio nodes tracked in pwTick, so they're excluded here).
-const LFO_SYNTH_KEYS = ['fmAmount','fmRatio','crossFm','ringAmt','fbAmt','shapeAmt','syncAmt','foldDrive','foldBias','crushBits','crushRate','amAmt','amRatio','filterCutoff','filterQ','waveX','waveY','noiseAmt','warp','morphX','morphY'];
+const LFO_SYNTH_KEYS = ['fmAmount','fmRatio','crossFm','ringAmt','fbAmt','shapeAmt','syncAmt','foldDrive','foldBias','crushBits','crushRate','amAmt','amRatio','filterCutoff','filterQ','waveX','waveY','noiseAmt','warp','morphX','morphY']
+  .concat(AXIS_GROUPS.map(([k]) => k));
 
 function lfoWaveFn(phase, type) {
   // phase in [0,1]
@@ -4367,11 +4538,13 @@ let audioStereo = true;  // true = X→L / Y→R, false = X+Y summed to mono
 
 // ── Internal / external input routing ────────────────────────────────────────
 // internalGain sums the synth (oscillators + noise); externalGain sums a captured
-// device. Both are pure 0/1 source switches into recordBus (fixed unity), which
-// splits into the record tap (recDest) and the speaker path (masterGain → monitorGain
-// → destination). Recordings are always full-level: the Volume slider, Monitor level
-// slider and Monitor mute shape ONLY what the speakers get, never what is recorded.
+// device. Both are pure 0/1 source switches into recordBus (fixed unity) → masterGain
+// (Volume), which then splits into the record tap (recFadeGain → recDest) and the
+// speaker path (monitorGain → destination). Volume therefore shapes the recording as
+// well as the speakers; Monitor level and mute sit past the tap and shape the
+// speakers alone, so a recording can be made in silence.
 let internalGain = null, externalGain = null, recordBus = null, recDest = null;
+let recFadeGain = null;                // the recording's own fade in / out
 let monitorGain = null;                // speaker path; carries monitor level + mute
 let externalStream = null, externalSource = null;
 let externalAnalyser = null;           // taps the external input for the level meter
@@ -4383,6 +4556,53 @@ let externalInputGainValue = 1;        // monitor level for the external input (
 let monitorEnabled = true;             // whether output is sent to the speakers
 let preferredSampleRate = 0;           // 0 = browser default; set to a captured input's rate
                                        // so the context matches it (avoids live resampling)
+
+// ── Equal-loudness weighting ────────────────────────────────────────────────
+// The ear is far less sensitive at the bottom of its range than in the middle,
+// so sweeping X's ratio from 1 to 16 over a 100 Hz base walks from nearly
+// inaudible to piercing at a fixed Volume. These are the ISO 226:2003 reference
+// points for the 60-phon contour — the SPL each frequency needs in order to
+// sound as loud as 1 kHz does at 60 dB. Weighting each oscillator by its own
+// fundamental's figure flattens that out.
+//
+// It is a per-oscillator gain on the FUNDAMENTAL, not a filter: a bright wave's
+// upper harmonics are not individually weighted, so this evens out the pitch of
+// a note rather than the spectrum inside it.
+const ELC_HZ  = [20,25,31.5,40,50,63,80,100,125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000,5000,6300,8000,10000,12500];
+const ELC_SPL = [109.5,104.3,99.0,94.2,89.7,85.4,81.5,78.1,75.0,72.0,69.3,66.8,64.5,62.5,60.8,59.5,58.4,60.0,62.0,62.6,60.0,57.2,55.5,56.4,59.5,64.9,71.0,76.0,80.0];
+const ELC_MAX_DB = 12;                 // how much correction is allowed, either way
+let eqLoudness = true;                 // apply the weighting
+let eqLoudDepth = 1;                   // 0 = off, 1 = the full contour
+// SPL required at f to match 1 kHz, by log-frequency interpolation of the table.
+function elcSPL(f) {
+  if (!(f > 0)) return ELC_SPL[0];
+  if (f <= ELC_HZ[0]) return ELC_SPL[0];
+  if (f >= ELC_HZ[ELC_HZ.length - 1]) return ELC_SPL[ELC_SPL.length - 1];
+  let i = 1;
+  while (i < ELC_HZ.length && ELC_HZ[i] < f) i++;
+  const lo = ELC_HZ[i - 1], hi = ELC_HZ[i];
+  const u = (Math.log(f) - Math.log(lo)) / (Math.log(hi) - Math.log(lo));
+  return ELC_SPL[i - 1] + (ELC_SPL[i] - ELC_SPL[i - 1]) * u;
+}
+// Gain for a fundamental at f. Normalised so the correction never exceeds unity
+// — the curve only ever ATTENUATES, so switching it on cannot clip the output;
+// it costs headroom instead, which the Volume slider gets back.
+function elcGain(f) {
+  if (!eqLoudness || eqLoudDepth <= 0.001) return 1;
+  const rel = Math.max(-ELC_MAX_DB, Math.min(ELC_MAX_DB, elcSPL(f) - elcSPL(1000)));
+  return Math.pow(10, (rel - ELC_MAX_DB) * eqLoudDepth / 20);
+}
+let eqGainX = null, eqGainY = null;
+function applyEqLoudness() {
+  const on = eqLoudness && eqLoudDepth > 0.001;
+  const row = document.getElementById('eq-loud-depth-row');
+  if (row) row.style.opacity = on ? 1 : 0.4;
+  const dEl = document.getElementById('eq-loud-depth'); if (dEl) dEl.disabled = !on;
+  if (!audioCtx || !eqGainX || !eqGainY) return;
+  const t = audioCtx.currentTime;
+  eqGainX.gain.setTargetAtTime(elcGain(params.fx * baseFreq), t, 0.03);
+  eqGainY.gain.setTargetAtTime(elcGain(params.fy * baseFreq), t, 0.03);
+}
 
 // Apply the current channel mode to the live panners (and reflect on toggle).
 function applyAudioChannelMode() {
@@ -4424,14 +4644,17 @@ function startAudio() {
   monitorGain.connect(audioCtx.destination);
   masterGain.connect(monitorGain);
 
-  // Record path: recordBus (fixed unity) → recDest. Taken BEFORE Volume / monitor
-  // level / mute, so recordings always contain full-level audio regardless of how
-  // quiet (or muted) the speakers are.
+  // Record path: recordBus → masterGain(Volume) → recFadeGain → recDest. The tap
+  // is AFTER Volume, so what you set is what the video gets; it stays BEFORE the
+  // monitor level and mute, so silencing the speakers still records normally.
   recDest = audioCtx.createMediaStreamDestination();
+  recFadeGain = audioCtx.createGain();
+  recFadeGain.gain.value = 1;
+  recFadeGain.connect(recDest);
   recordBus = audioCtx.createGain();
   recordBus.gain.value = 1;
-  recordBus.connect(recDest);
   recordBus.connect(masterGain);
+  masterGain.connect(recFadeGain);
 
   // Source buses. internalGain carries the synth; externalGain carries the device.
   // Both are pure 0/1 switches — exactly one is open at a time.
@@ -4450,24 +4673,30 @@ function startAudio() {
   externalAnalyser.smoothingTimeConstant = 0.3;
   externalAnalyser.connect(externalGain);
 
-  // X → left (stereo) or centre (mono)
+  // X → left (stereo) or centre (mono), through its own loudness weighting.
   panX = audioCtx.createStereoPanner();
   panX.pan.value = audioStereo ? -1 : 0;
   panX.connect(internalGain);
+  eqGainX = audioCtx.createGain();
+  eqGainX.gain.value = elcGain(params.fx * baseFreq);
+  eqGainX.connect(panX);
 
   oscX = audioCtx.createOscillator();
   oscX.frequency.value = params.fx * baseFreq;
-  oscX.connect(panX);
+  oscX.connect(eqGainX);
   oscX.start();
 
   // Y → right (stereo) or centre (mono)
   panY = audioCtx.createStereoPanner();
   panY.pan.value = audioStereo ? 1 : 0;
   panY.connect(internalGain);
+  eqGainY = audioCtx.createGain();
+  eqGainY.gain.value = elcGain(params.fy * baseFreq);
+  eqGainY.connect(panY);
 
   oscY = audioCtx.createOscillator();
   oscY.frequency.value = params.fy * baseFreq;
-  oscY.connect(panY);
+  oscY.connect(eqGainY);
   oscY.start();
 
   // Unison pair: same wavetables, detuned ±unisonDetune cents (X up, Y down for
@@ -4476,8 +4705,8 @@ function startAudio() {
   unisonGainX = audioCtx.createGain();
   unisonGainY = audioCtx.createGain();
   unisonGainX.gain.value = unisonGainY.gain.value = Math.max(0, params.unisonMix || 0);
-  unisonGainX.connect(panX);
-  unisonGainY.connect(panY);
+  unisonGainX.connect(eqGainX);   // the pair shares its axis's weighting
+  unisonGainY.connect(eqGainY);
   oscX2 = audioCtx.createOscillator();
   oscX2.frequency.value = params.fx * baseFreq;
   oscX2.detune.value = params.unisonDetune || 0;
@@ -4519,7 +4748,7 @@ function stopAudio() {
   // (the rest of the file would be silent) — finish the recording cleanly first.
   // Covers the reset-engine button, output-off, and sample-rate rebuilds alike.
   if (recording) {
-    stopRecording();
+    stopRecording(true);
     recStatus('recording stopped (audio engine was rebuilt)');
   }
   if (oscX) { try { oscX.stop(); } catch(e) {} oscX = null; }
@@ -4527,6 +4756,7 @@ function stopAudio() {
   if (oscX2) { try { oscX2.stop(); } catch(e) {} oscX2 = null; }
   if (oscY2) { try { oscY2.stop(); } catch(e) {} oscY2 = null; }
   unisonGainX = unisonGainY = null;
+  eqGainX = eqGainY = null; recFadeGain = null;
   if (noiseSrc) { try { noiseSrc.stop(); } catch(e) {} noiseSrc = null; }
   noiseGain = null;
   // Release any captured external input device.
@@ -4539,6 +4769,7 @@ function stopAudio() {
 }
 
 function syncAudioParams() {
+  applyEqLoudness();
   const fxHz = params.fx * baseFreq;
   const fyHz = params.fy * baseFreq;
   document.getElementById('audio-fx-hz').textContent = Math.round(fxHz) + ' Hz';
@@ -4923,10 +5154,24 @@ function setTrailMode(m) {
   const keepRow = document.getElementById('trail-keep-row');
   if (row) row.style.display = m === 1 ? 'none' : '';
   if (keepRow) keepRow.style.display = m === 1 ? '' : 'none';
+  const qRow = document.getElementById('trail-quality-row');
+  if (qRow) qRow.style.display = m === 1 ? '' : 'none';
   clearTrail();
 }
 document.querySelectorAll('.wave-btn[data-trailmode]').forEach(btn => {
   btn.addEventListener('click', () => setTrailMode(parseInt(btn.dataset.trailmode)));
+});
+function setTrailQuality(q) {
+  trailQuality = (q === 'full' || q === 'fast') ? q : 'auto';
+  _ghStep = 0; _frameAvg = 16.7;
+  document.querySelectorAll('.wave-btn[data-trailq]').forEach(b => {
+    const on = b.dataset.trailq === trailQuality;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+document.querySelectorAll('.wave-btn[data-trailq]').forEach(btn => {
+  btn.addEventListener('click', () => setTrailQuality(btn.dataset.trailq));
 });
 const TRAIL_KEEP_SLIDERS = [
   ['trail-count',   'trailCount',   v => String(Math.round(v))],
@@ -5137,11 +5382,6 @@ document.getElementById('phase-y').addEventListener('input', e => {
 // ── Sync mode checkboxes (hard/soft + single axis) ───────────────────────────
 document.getElementById('sync-hard').addEventListener('change', e => {
   syncHard = e.target.checked;
-  drawWavePreview();
-  schedulePeriodicWaveUpdate();
-});
-document.getElementById('sync-single').addEventListener('change', e => {
-  syncSingle = e.target.checked;
   drawWavePreview();
   schedulePeriodicWaveUpdate();
 });
@@ -5592,6 +5832,8 @@ const MAP_TARGETS = {
   ay:        { label:'Y Amplitude',   min:0.1,  max:1,              apply:v => { params.ay = v; const e=document.getElementById('ay'); if(e)e.value=v; const d=document.getElementById('ay-val'); if(d)d.textContent=v.toFixed(2); } },
   fmAmount:  { label:'FM Amount',     min:0,    max:8,              apply:_synthApply('fmAmount','fm-amount','fm-amount-val',x=>x.toFixed(1)) },
   fmRatio:   { label:'FM Ratio',      min:0.5,  max:8,              apply:v => setRatioParam('fmRatio','fm-ratio','fm-ratio-val',v) },
+  ...Object.fromEntries(AXIS_GROUPS.map(([k, label]) => [k,
+    { label: label + ' → Axis', min: 0, max: 2, step: 1, apply: v => setAxisTarget(k, v) }])),
   warp:      { label:'Warp',          min:-1,   max:1,              apply:_synthApply('warp','warp','warp-val',fmtWarp) },
   morphX:    { label:'X Wave Morph',  min:0,    max:3,              apply:v => setWaveMorph('x', v) },
   morphY:    { label:'Y Wave Morph',  min:0,    max:3,              apply:v => setWaveMorph('y', v) },
@@ -5655,6 +5897,7 @@ completeVelRanges();
 // Starting values per mappable target — used to restore params when MIDI disconnects.
 const MAP_DEFAULTS = {
   fx:3, fy:2, ax:1, ay:1, fmAmount:0, fmRatio:2, shapeAmt:0, warp:0, morphX:0, morphY:0,
+  ...Object.fromEntries(AXIS_GROUPS.map(([k]) => [k, 0])),
   syncAmt:1, foldDrive:1, amAmt:0, amRatio:2, noiseAmt:0, waveX:0, waveY:0,
   crossFm:0, ringAmt:0, fbAmt:0, foldBias:0, crushBits:16, crushRate:0,
   unisonDetune:0, unisonMix:0,
@@ -5951,8 +6194,6 @@ document.getElementById('map-slew').addEventListener('input', e => {
 // chosen so the single cycle's natural fundamental is C0 (≈16.35 Hz): with 2048
 // frames that means SR = 2048 × C0 ≈ 33488 Hz, so the loop repeats at C0 when
 // played at its native rate. Reflects all current synth params.
-const C0_HZ = 16.351597831287414;          // C0, scientific pitch (A4 = 440)
-const SINGLE_CYCLE_SR = Math.round(2048 * C0_HZ);  // = 33488
 // Write 16-bit PCM WAV from an array of channel buffers (1 = mono, 2 = stereo).
 function samplesToWavBlob(channels, sampleRate) {
   const numCh = channels.length;
@@ -6015,14 +6256,17 @@ document.getElementById('btn-export-wav').addEventListener('click', () => {
     channels = [mono];
     chTag = 'mono';
   }
-  const blob = samplesToWavBlob(channels, SINGLE_CYCLE_SR);
+  // One cycle over 2048 samples: playing it back at 2048 × f samples/second makes
+  // that cycle last exactly 1/f of a second, i.e. sound at f.
+  const sr = Math.max(8000, Math.round(2048 * noteToHz(wavRootNote)));
+  const blob = samplesToWavBlob(channels, sr);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const fmTag = params.fmAmount > 0.05 ? `_fm${params.fmAmount.toFixed(1)}` : '';
   const fdTag = params.foldDrive > 1.05 ? `_fold${params.foldDrive.toFixed(1)}` : '';
   const amTag = params.amAmt > 0.01 ? `_am${params.amAmt.toFixed(2)}` : '';
   a.href = url;
-  a.download = `lissajous_cycle_C0_${chTag}_${waveTypeX}-${waveTypeY}${fmTag}${fdTag}${amTag}.wav`;
+  a.download = `lissajous_cycle_${noteToName(wavRootNote)}_${chTag}_${waveTypeX}-${waveTypeY}${fmTag}${fdTag}${amTag}.wav`;
   a.click();
   URL.revokeObjectURL(url);
 });
@@ -6046,7 +6290,7 @@ function buildPeriodicWave(type, axis) {
   }
   _audioSampling = false;
   // Apply the same waveform filter (one cycle in the wavetable → fundamental = 1).
-  if (filterIsOn()) {
+  if (filterIsOn() && onAxis('filterAxis', axis || 'x')) {
     const wc = Math.PI * 2 * Math.min(0.49, filterHarmonics() / PW_N);
     filterPeriodic(x, PW_N, biquadCoeffs(filterType, wc, params.filterQ));
   }
@@ -6081,13 +6325,15 @@ function applyPeriodicWave() {
     // Reuse X's wave only when both axes are truly identical (same base type and
     // nothing targeting one axis — sync "X only", or FM/AM set to a single axis)
     // — otherwise build Y separately.
-    const syncDiffers = syncSingle && Math.abs(params.syncAmt - 1) > 0.001;
+    const syncDiffers = (params.syncAxis | 0) !== 0 && Math.abs(params.syncAmt - 1) > 0.001;
     const fmDiffers = (params.fmAxis | 0) !== 0 && params.fmAmount > 0.0001;
     const amDiffers = (params.amAxis | 0) !== 0 && params.amAmt > 0.001;
     // A per-axis waveform morph makes the two axes different waves even when both
     // buttons name the same shape, so the wavetable can no longer be shared.
     const morphDiffers = Math.abs((params.morphX || 0) - (params.morphY || 0)) > 0.0005;
-    const axisDiffers = syncDiffers || fmDiffers || amDiffers || morphDiffers;
+    // Any stage aimed at one axis makes the two genuinely different waves.
+    const aimed = AXIS_GROUPS.some(([k]) => (params[k] | 0) !== 0);
+    const axisDiffers = syncDiffers || fmDiffers || amDiffers || morphDiffers || aimed;
     const pwY = (waveTypeY === waveTypeX && !axisDiffers) ? pwX : buildPeriodicWave(waveTypeY, 'y');
     if (pwY) oscY.setPeriodicWave(pwY);
     if (pwX && oscX2) oscX2.setPeriodicWave(pwX);
@@ -6134,9 +6380,10 @@ function serializePreset() {
   return {
     app: 'lissajous', version: 4,
     params: { ...params },
-    waveTypeX, waveTypeY, visualSwap, audioStereo, syncHard, syncSingle,
+    waveTypeX, waveTypeY, visualSwap, audioStereo, syncHard,
     filterType, phaseModulators,
-    animating, animSpeed, constructionView, rotSpin, mapSlewTau,
+    animating, animSpeed, constructionView, rotSpin, mapSlewTau, trailQuality,
+    eqLoudness, eqLoudDepth, recFadeIn, recFadeOut, wavRootNote,
     baseFreq, baseFreqMode,
     strokeHSL: { ...strokeHSL },
     lfos: lfos.map(l => ({ wave: l.wave, freq: l.freq, depth: l.depth, retrigger: l.retrigger, assignments: [...l.assignments] })),
@@ -6171,8 +6418,7 @@ function refreshAllControls() {
   setWaveMorph('y', params.morphY ?? Math.max(0, WAVE_ORDER.indexOf(waveTypeY)));
   setModWave('fm', params.fmWave || 'sine');
   setModWave('am', params.amWave || 'sine');
-  setModAxis('fm', params.fmAxis ?? 0);
-  setModAxis('am', params.amAxis ?? 0);
+  refreshAxisToggles();
   document.getElementById('animate').checked = animating;
   setS('anim-speed', animSpeed, 'speed-val', v => v.toFixed(1) + '×');
   document.getElementById('anim-speed-row').style.opacity = animating ? '1' : '0.4';
@@ -6181,7 +6427,6 @@ function refreshAllControls() {
   setS('untraced-alpha', params.untracedAlpha ?? 0.2, 'untraced-alpha-val', v => Math.round(v * 100) + '%');
   updateConstructionControls();
   document.getElementById('sync-hard').checked = syncHard;
-  document.getElementById('sync-single').checked = syncSingle;
   setFilterType(filterType);
   setS('filter-freq', params.filterCutoff, 'filter-freq-val', () => fmtCutoff(params.filterCutoff));
   setS('filter-res', params.filterQ, 'filter-res-val', v => v.toFixed(1));
@@ -6190,6 +6435,13 @@ function refreshAllControls() {
   UNISON_SLIDERS.forEach(([id, key, fmt]) => setS(id, params[key] ?? 0, id + '-val', fmt));
   setMirrorMode(params.mirrorMode ?? 0);
   setTrailMode(params.trailMode ?? 0);
+  setTrailQuality(trailQuality);
+  document.getElementById('eq-loudness').checked = eqLoudness;
+  setS('eq-loud-depth', eqLoudDepth, 'eq-loud-depth-val', v => Math.round(v * 100) + '%');
+  setS('rec-fade-in', recFadeIn, 'rec-fade-in-val', fmtFade);
+  setS('rec-fade-out', recFadeOut, 'rec-fade-out-val', fmtFade);
+  setWavRoot(wavRootNote);
+  applyEqLoudness();
   TRAIL_KEEP_SLIDERS.forEach(([id, key, fmt]) => setS(id, params[key] ?? 0, id + '-val', fmt));
   setRotAxis(params.rotAxis ?? 0);
   setDepthSrc(params.depthSrc ?? 0);
@@ -6237,7 +6489,10 @@ function applyPresetData(d) {
   if (typeof d.visualSwap === 'boolean') visualSwap = d.visualSwap;
   if (typeof d.audioStereo === 'boolean') audioStereo = d.audioStereo;
   if (typeof d.syncHard === 'boolean') syncHard = d.syncHard;
-  if (typeof d.syncSingle === 'boolean') syncSingle = d.syncSingle;
+  // Sync's "X only" checkbox became an Apply-to row like every other stage.
+  if (typeof d.syncSingle === 'boolean' && d.params && d.params.syncAxis === undefined) {
+    params.syncAxis = d.syncSingle ? 1 : 0;
+  }
   if (d.filterType) filterType = d.filterType;
   if (typeof d.phaseModulators === 'boolean') phaseModulators = d.phaseModulators;
   if (typeof d.animating === 'boolean') animating = d.animating;
@@ -6245,6 +6500,12 @@ function applyPresetData(d) {
   if (typeof d.constructionView === 'boolean') constructionView = d.constructionView;
   rotSpin = typeof d.rotSpin === 'boolean' ? d.rotSpin : false;
   if (typeof d.mapSlewTau === 'number') mapSlewTau = d.mapSlewTau;
+  if (typeof d.trailQuality === 'string') trailQuality = d.trailQuality;
+  if (typeof d.eqLoudness === 'boolean') eqLoudness = d.eqLoudness;
+  if (typeof d.eqLoudDepth === 'number') eqLoudDepth = d.eqLoudDepth;
+  if (typeof d.recFadeIn === 'number') recFadeIn = d.recFadeIn;
+  if (typeof d.recFadeOut === 'number') recFadeOut = d.recFadeOut;
+  if (typeof d.wavRootNote === 'number') wavRootNote = d.wavRootNote;
   if (typeof d.baseFreq === 'number') baseFreq = d.baseFreq;
   if (d.strokeHSL) strokeHSL = { ...d.strokeHSL };
   else if (d.params && d.params.strokeColor) strokeHSL = hexToHsl(d.params.strokeColor);
@@ -6305,6 +6566,20 @@ function setZoom(v, fromSlider) {
 }
 let recShowFrame = false;
 let recording = false;
+// Fade the recording up from, and back down to, the background colour. The
+// out-fade is why stopping is not instant: the clip has to keep running for its
+// duration, so the button says so and the recorder is stopped at the end of it.
+let recFadeIn = 0, recFadeOut = 0;     // seconds, 0 = none
+let recStartAt = 0;                    // performance.now() when recording began
+let recFadingOut = 0;                  // performance.now() when stop was pressed
+let recStopTimer = null;
+// 0 = fully background, 1 = fully the picture.
+function recFadeLevel(now) {
+  let k = 1;
+  if (recFadeIn > 0.001) k = Math.min(k, (now - recStartAt) / (recFadeIn * 1000));
+  if (recFadingOut) k = Math.min(k, 1 - (now - recFadingOut) / (Math.max(0.001, recFadeOut) * 1000));
+  return Math.max(0, Math.min(1, k));
+}
 let mediaRecorder = null, recChunks = [];
 let fullCanvas = null, fullCtx = null, recCanvas = null, recCtx = null;
 
@@ -6343,6 +6618,15 @@ function captureRecFrame(phase) {
   recCtx.fillStyle = params.bgColor;
   recCtx.fillRect(0, 0, outW, outH);
   recCtx.drawImage(fullCanvas, cx, cy, cw0, ch0, 0, 0, outW, outH);
+  // Fade by veiling the frame with the background colour, so the clip opens and
+  // closes on the same flat field the figure sits on rather than on black.
+  const k = recFadeLevel(performance.now());
+  if (k < 0.999) {
+    recCtx.globalAlpha = 1 - k;
+    recCtx.fillStyle = params.bgColor;
+    recCtx.fillRect(0, 0, outW, outH);
+    recCtx.globalAlpha = 1;
+  }
 }
 
 function pickVideoMime() {
@@ -6370,9 +6654,9 @@ function startRecording() {
   // whatever is playing, internal synth OR external input (both feed recordBus →
   // recDest at fixed unity). Recording the raw getUserMedia track directly proved
   // unreliable in Chrome (it can capture silence once the track is also consumed by
-  // the AudioContext + the muted <audio> pump). The recDest tap sits before Volume /
-  // Monitor level / mute, so recordings contain full-level audio no matter how the
-  // speaker path is set.
+  // the AudioContext + the muted <audio> pump). The recDest tap sits AFTER Volume
+  // (the level you set is the level you get) but before the monitor level and mute,
+  // so the speakers can be silent while the recording is not.
   let hasAudio = false;
   if (audioCtx && recDest && recDest.stream && recDest.stream.getAudioTracks().length) {
     recDest.stream.getAudioTracks().forEach(tr => { stream.addTrack(tr); hasAudio = true; });
@@ -6398,17 +6682,53 @@ function startRecording() {
   };
   mediaRecorder.start();
   recording = true;
+  recStartAt = performance.now();
+  recFadingOut = 0;
+  // The audio rides the same fade as the picture, or a clip that dips to the
+  // background colour would still be at full level when it gets there.
+  if (recFadeGain && audioCtx) {
+    const t = audioCtx.currentTime;
+    recFadeGain.gain.cancelScheduledValues(t);
+    if (recFadeIn > 0.001) {
+      recFadeGain.gain.setValueAtTime(0.0001, t);
+      recFadeGain.gain.linearRampToValueAtTime(1, t + recFadeIn);
+    } else recFadeGain.gain.setValueAtTime(1, t);
+  }
   const btn = document.getElementById('rec-toggle');
   btn.textContent = '■ stop'; btn.style.borderColor = '#f06060'; btn.style.color = '#f06060';
   recStatus(`● recording ${outW}×${outH} (${recAspectName})${hasAudio ? ' + audio' : ' (no audio — enable output)'}…`);
 }
 
-function stopRecording() {
+// `immediate` skips the out-fade — used when the audio engine is torn down under
+// the recorder, where there is nothing left to fade.
+function stopRecording(immediate) {
   if (!recording) return;
+  if (!immediate && recFadeOut > 0.001 && !recFadingOut) {
+    // Keep rolling for the length of the fade, then stop for real.
+    recFadingOut = performance.now();
+    if (recFadeGain && audioCtx) {
+      const t = audioCtx.currentTime;
+      recFadeGain.gain.cancelScheduledValues(t);
+      recFadeGain.gain.setValueAtTime(recFadeGain.gain.value, t);
+      recFadeGain.gain.linearRampToValueAtTime(0.0001, t + recFadeOut);
+    }
+    const btn = document.getElementById('rec-toggle');
+    btn.textContent = '… fading'; btn.disabled = true;
+    recStatus(`fading out (${recFadeOut.toFixed(1)}s)…`);
+    recStopTimer = setTimeout(() => stopRecording(true), recFadeOut * 1000 + 60);
+    return;
+  }
+  if (recStopTimer) { clearTimeout(recStopTimer); recStopTimer = null; }
   recording = false;
+  recFadingOut = 0;
+  if (recFadeGain && audioCtx) {
+    recFadeGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    recFadeGain.gain.setValueAtTime(1, audioCtx.currentTime);
+  }
   try { mediaRecorder.stop(); } catch (e) {}
   const btn = document.getElementById('rec-toggle');
-  btn.textContent = '● record'; btn.style.borderColor = ''; btn.style.color = '';
+  btn.textContent = '● record'; btn.disabled = false;
+  btn.style.borderColor = ''; btn.style.color = '';
 }
 
 function updateRecOverlay() {
@@ -6508,6 +6828,40 @@ window.addEventListener('keydown', e => {
   e.preventDefault();
 });
 document.getElementById('rec-show-frame').addEventListener('change', e => { recShowFrame = e.target.checked; updateRecOverlay(); });
+const fmtFade = v => v < 0.05 ? 'off' : v.toFixed(1) + 's';
+document.getElementById('rec-fade-in').addEventListener('input', e => {
+  recFadeIn = parseFloat(e.target.value);
+  document.getElementById('rec-fade-in-val').textContent = fmtFade(recFadeIn);
+});
+document.getElementById('rec-fade-out').addEventListener('input', e => {
+  recFadeOut = parseFloat(e.target.value);
+  document.getElementById('rec-fade-out-val').textContent = fmtFade(recFadeOut);
+});
+
+// Equal-loudness weighting.
+document.getElementById('eq-loudness').addEventListener('change', e => {
+  eqLoudness = e.target.checked;
+  applyEqLoudness();
+});
+document.getElementById('eq-loud-depth').addEventListener('input', e => {
+  eqLoudDepth = parseFloat(e.target.value);
+  document.getElementById('eq-loud-depth-val').textContent = Math.round(eqLoudDepth * 100) + '%';
+  applyEqLoudness();
+});
+
+// Single-cycle export root note. The slider is a MIDI note number; C0 = 12.
+let wavRootNote = 12;
+function setWavRoot(n) {
+  wavRootNote = Math.max(0, Math.min(48, Math.round(n)));
+  const el = document.getElementById('wav-root'); if (el) el.value = wavRootNote;
+  const d = document.getElementById('wav-root-val');
+  if (d) {
+    const sr = Math.round(2048 * noteToHz(wavRootNote));
+    d.textContent = noteToName(wavRootNote) + ' · ' + (sr / 1000).toFixed(1) + ' kHz';
+  }
+}
+document.getElementById('wav-root').addEventListener('input', e => setWavRoot(parseFloat(e.target.value)));
+setWavRoot(wavRootNote);
 document.getElementById('rec-toggle').addEventListener('click', () => { recording ? stopRecording() : startRecording(); });
 window.addEventListener('resize', updateRecOverlay);
 
@@ -6772,7 +7126,7 @@ const MORPH_DISCRETE = new Set(['fx', 'fy', 'mirrorMode', 'rotAxis', 'fillSurfac
 // The rest of a patch's stepped state lives outside `params` — the waveforms, the
 // filter type, the view toggles. Same treatment, same list.
 const MORPH_DISCRETE_TOP = ['waveTypeX', 'waveTypeY', 'visualSwap', 'audioStereo', 'syncHard',
-                            'syncSingle', 'filterType', 'phaseModulators', 'animating',
+                            'filterType', 'phaseModulators', 'animating',
                             'constructionView', 'rotSpin'];
 // A copy of `target` whose stepped fields are taken from `source` instead. Both
 // arguments are serializePreset()-shaped, so this composes a patch out of one
@@ -6918,6 +7272,7 @@ document.getElementById('grid-toggle').addEventListener('click', () => {
 });
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
+buildAxisToggles();
 buildGrid();
 setMorphStepMode(morphStepMode);
 updateConstructionControls();
